@@ -1,0 +1,6 @@
+import %workspace%/tensorflow/tools/bazel.rc
+import %workspace%/tensorflow/.tf_configure.bazelrc
+
+build --define PYTHON_LIB_PATH=$PYTHON_BINARY/../../lib/python$PYTHON_MAJOR_VERSION/site-packages
+
+build --package_path=%workspace%:%workspace%/tensorflow/
