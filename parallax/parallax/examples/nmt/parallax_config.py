@@ -20,7 +20,7 @@ import parallax
 
 flags = tf.app.flags
 flags.DEFINE_boolean('replicate_variables', True, """replicate_variables""")
-flags.DEFINE_string('protocol', 'grpc+verbs', """The method for managing variables""")
+flags.DEFINE_string('protocol', 'grpc', """The method for managing variables""")
 flags.DEFINE_boolean('use_allgatherv', False, """use allgatherv instead of allgather""")
 tf.app.flags.DEFINE_string('mpirun_options', '', 'option for mpirun')
 flags.DEFINE_string('run_option', None,

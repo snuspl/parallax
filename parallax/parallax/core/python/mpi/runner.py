@@ -32,6 +32,12 @@ from parallax.core.python.common.consts import *
 from parallax.core.python.mpi.graph_transform import graph_transform_mpi
 
 def create_mpi_script(driver_path, args, hostname, gpus, port=22):
+
+    cmd = 'ssh -p %d %s "mkdir -p %s"' % (port, hostname, REMOTE_PARALLAX_ROOT)
+    parallax_log.warning(colored('\n$ %s' % cmd, 'red'))
+    proc = subprocess.Popen(args=cmd, shell=True)
+    proc.wait()
+
     cmd_run = 'python %s %s' % (driver_path, ' '.join(args))
 
     try:
@@ -55,7 +61,7 @@ def create_mpi_script(driver_path, args, hostname, gpus, port=22):
 
     remote_cmd = 'echo \'%s\' | ' % mpi_script
     remote_cmd += 'ssh -p %d %s' % (port, hostname)
-    remote_cmd += ' \'cat > %s\' && chmod 777 %s' % (REMOTE_MPI_SCRIPT_PATH, REMOTE_MPI_SCRIPT_PATH)
+    remote_cmd += ' \'cat > %s; chmod 777 %s\'' % (REMOTE_MPI_SCRIPT_PATH, REMOTE_MPI_SCRIPT_PATH)
     parallax_log.warning(colored('\n$ %s' % remote_cmd, 'red'))
     proc = subprocess.Popen(args=remote_cmd, shell=True)
     proc.wait()
