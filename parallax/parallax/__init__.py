@@ -22,3 +22,4 @@ from parallax.core.python.common.config import PSConfig
 from parallax.core.python.common.config import MPIConfig
 from parallax.core.python.common.config import CommunicationConfig
 from parallax.core.python.common.config import CheckPointConfig
+from parallax.core.python.common.config import ProfileConfig

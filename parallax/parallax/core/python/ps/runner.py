@@ -27,6 +27,7 @@ import tensorflow as tf
 from parallax.core.python.common import graph_transform_lib
 from parallax.core.python.common.lib import *
 from parallax.core.python.common.consts import *
+from parallax.core.python.common.session_context import ParallaxSessionContext
 from parallax.core.python.ps.graph_transform import graph_transform_ps
 
 
@@ -256,17 +257,22 @@ def parallax_run_ps(single_gpu_meta_graph_def, run, config, is_test,
                 "Finished initialization process, start training on worker %d"
                 % worker_id)
 
-            if is_test:
-                parallax_log.debug('warmup is started')
-                run(sess, NUM_ITERATIONS_FOR_WARMUP,
-                    tensor_or_op_name_to_replica_names, num_workers, worker_id,
-                    num_replicas_per_worker)
-                parallax_log.debug('warmup is ended')
+            step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
+            with ParallaxSessionContext(step,
+                                        config.profile_config.profile_dir,
+                                        config.profile_config.profile_steps):
+                if is_test:
+                    parallax_log.debug('warmup is started')
+                    run(sess, NUM_ITERATIONS_FOR_WARMUP,
+                        tensor_or_op_name_to_replica_names, num_workers, 
+                        worker_id, num_replicas_per_worker)
+                    parallax_log.debug('warmup is ended')
 
-            start_time = time.time()
-            run(sess, config.num_iterations(is_test), tensor_or_op_name_to_replica_names,
-                num_workers, worker_id, num_replicas_per_worker)
-            end_time = time.time()
+                start_time = time.time()
+                run(sess, config.num_iterations(is_test), 
+                    tensor_or_op_name_to_replica_names,
+                    num_workers, worker_id, num_replicas_per_worker)
+                end_time = time.time()
 
             if is_test:
                 send_execution_time(config.resource_info['master'][0], worker_id,

@@ -38,21 +38,26 @@ ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect
 	* ckpt_dir: The checkpoint directory to store/restore global variables.
 	* save_ckpt_steps: The frequency, in number of global steps, that a checkpoint is saved using a default checkpoint saver.
 	* save_ckpt_secs: The frequency, in seconds, that a checkpoint is saved using a default checkpoint saver.
-
+* profile_config: The configuration for profile. CUPTI library path (e.g., /usr/local/cuda/extras/CUPTI/lib64) needs to be added to LD_LIBRARY_PATH
+        * profile_dir: Then profile diretory to store RunMetadata.
+        * profile_steps: A list of steps when to store RunMetadata.
 Below code is an example of how to use **ParallaxConfig**.
 ```
-ckpt_config = parallax.CheckPointConfig(ckpt_dir=FLAGS.ckpt_dir,
+ckpt_config = parallax.CheckPointConfig(ckpt_dir=ckpt_dir,
                                         save_ckpt_steps=save_ckpt_steps)
-ps_config = parallax.PSConfig(replicate_variables=FLAGS.replicate_variables,
-                              protocol=FLAGS.protocol)
-mpi_config = parallax.MPIConfig(use_allgatherv=FLAGS.use_allgatherv,
-                                mpirun_options=FLAGS.mpirun_options)
+ps_config = parallax.PSConfig(replicate_variables=replicate_variables,
+                              protocol=protocol)
+mpi_config = parallax.MPIConfig(use_allgatherv=use_allgatherv,
+                                mpirun_options=mpirun_options)
+profile_config = parallax.ProfileConfig(profile_dir=/tmp/profile,
+                                        profile_steps=[100,200,300])
 parallax_config = parallax.Config()
-parallax_config.run_option = FLAGS.run_option,
+parallax_config.run_option = run_option,
 parallax_config.average_sparse = False
-parallax_config.redirect_path = FLAGS.redirect_path
+parallax_config.redirect_path = redirect_path
 parallax_config.communication_config = parallax.CommunicationConfig(ps_config, mpi_config)
-parallax_config.ckpt_config=ckpt_config
+parallax_config.ckpt_config = ckpt_config
+parallax_config.profile_config = profile_config
 ...
 parallel_run(..., parallax_config=parallax_config)
 ```
