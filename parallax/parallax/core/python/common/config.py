@@ -21,7 +21,10 @@ from parallax.core.python.common.consts import *
 class PSConfig(object):
     def __init__(self,
                  protocol='grpc',
-                 replicate_variables=True):
+                 replicate_variables=True,
+                 local_aggregation=True,
+                 boundary_among_servers=True,
+                 boundary_between_workers_and_servers=True):
         """
         Args:
           protocol: Specifies the protocol to be used by the server.
@@ -32,10 +35,18 @@ class PSConfig(object):
             and updates its copy after the parameter servers are all
             updated with the gradients from all servers. Only works with
             `sync=True`.
+          local_aggregation: Gradients are aggregated within a machine
+            before sending them to servers.
+          boundary_among_serves: Optimize operation placement among
+            servers.
+          boundary_between_workers_and_servers: Optimize operation 
+            placement between workers and servers.
         """
         self.protocol = protocol
         self.replicate_variables = replicate_variables
-
+        self.local_aggregation = local_aggregation
+        self.boundary_among_servers = boundary_among_servers
+        self.boundary_between_workers_and_servers = boundary_between_workers_and_servers
 
 class MPIConfig(object):
     def __init__(self,
@@ -95,7 +106,7 @@ class CheckPointConfig(object):
 
 class ParallaxConfig(object):
     def __init__(self,
-                 run_option=None,
+                 run_option='HYBRID',
                  average_sparse=False,
                  sess_config=None,
                  redirect_path=None,
@@ -104,8 +115,7 @@ class ParallaxConfig(object):
         """Configurable options of Parallax.
 
         Args:
-          run_option: A string(PS or MPI). If the option is None, the faster
-            communication is selected automatically.
+          run_option: A string(PS, MPI or HYBRID).
           average_sparse: A boolean. If True, sparse parameters are updated
             by the averaged gradients over all replicas. Otherwise,
             the sum of all gradients are used.
@@ -130,11 +140,8 @@ class ParallaxConfig(object):
         self._num_iterations = None
         self._resource_info = None
 
-    def get_ckpt_config(self, is_test):
-        if is_test:
-            return CheckPointConfig()
-        else:
-            return self.ckpt_config
+    def get_ckpt_config(self):
+        return self.ckpt_config
 
     def set_sync(self, sync):
         self._sync = sync
@@ -146,11 +153,8 @@ class ParallaxConfig(object):
     def set_num_iterations(self, num_iterations):
         self._num_iterations = num_iterations
 
-    def num_iterations(self, is_test):
-        if is_test:
-            return NUM_ITERATIONS_FOR_TEST
-        else:
-            return self._num_iterations
+    def num_iterations(self):
+        return self._num_iterations
 
     def set_resource_info(self, resource_info):
         self._resource_info = resource_info

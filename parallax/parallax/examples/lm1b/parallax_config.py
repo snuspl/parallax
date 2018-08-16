@@ -22,8 +22,8 @@ flags.DEFINE_boolean('replicate_variables', True, """replicate_variables""")
 flags.DEFINE_string('protocol', 'grpc', """The method for managing variables""")
 flags.DEFINE_boolean('use_allgatherv', False, """use allgatherv instead of allgather""")
 flags.DEFINE_string('mpirun_options', '', 'The option for mpirun')
-flags.DEFINE_string('run_option', None,
-                    'The run option whether PS or MPI, None utilizes both')
+flags.DEFINE_string('run_option', 'HYBRID',
+                    'The run option whether PS, MPI or HYBRID')
 flags.DEFINE_string('redirect_path', None, """redirect path to keep the log of distributed workers""")
 flags.DEFINE_string('ckpt_dir', None, """Directory to save checkpoints""")
 flags.DEFINE_integer('save_ckpt_steps', None,

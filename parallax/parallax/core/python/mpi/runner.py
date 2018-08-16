@@ -76,7 +76,7 @@ def _prepare_worker(worker, driver_path, args):
     create_mpi_script(driver_path, args, worker['hostname'], worker['gpus'])
 
 
-def _get_mpi_cmd(config, is_test):
+def _get_mpi_cmd(config):
     workers = config.resource_info['worker']
     mpi_cmd = 'mpirun -bind-to none -map-by slot' \
               ' -mca orte_base_help_aggregate 0'\
@@ -84,7 +84,7 @@ def _get_mpi_cmd(config, is_test):
     mpi_cmd += config.communication_config.mpi_config.mpirun_options
 
     arg_runop = '-x %s=%s' % (PARALLAX_RUN_OPTION,
-                             PARALLAX_TEST_MPI if is_test else PARALLAX_RUN_MPI)
+                              PARALLAX_RUN_MPI)
     arg_resource = '-x %s=%s' % (PARALLAX_RESOURCE_INFO, serialize_resource_info(config.resource_info))
     num_process = reduce(lambda s, x: s + len(x['gpus']), workers, 0)
     arg_np = '-np %d' % num_process
@@ -92,7 +92,6 @@ def _get_mpi_cmd(config, is_test):
     arg_out = ''
     if config.redirect_path is not None:
         arg_out += '-output-filename %s/mpi' % config.redirect_path
-        arg_out += '_test' if is_test else ''
     arg_script = 'bash %s' % REMOTE_MPI_SCRIPT_PATH
     std_err_redir = '2>&1'
 
@@ -102,11 +101,11 @@ def _get_mpi_cmd(config, is_test):
     return mpi_cmd
 
 
-def launch_mpi_driver(driver_path, args, config, is_test=False):
+def launch_mpi_driver(driver_path, args, config):
     workers = config.resource_info['worker']
     _prepare_workers(workers, driver_path, args)
 
-    mpi_cmd = _get_mpi_cmd(config, is_test)
+    mpi_cmd = _get_mpi_cmd(config)
 
     parallax_log.warning(colored('\n$ %s' % mpi_cmd, 'red'))
     proc = subprocess.Popen(args=mpi_cmd, shell=True)
@@ -126,7 +125,7 @@ def _init_global_vars(sess):
             sess.run(c)
 
 
-def parallax_run_mpi(single_gpu_meta_graph_def, run, config, is_test,
+def parallax_run_mpi(single_gpu_meta_graph_def, run, config,
                      export_graph=True):
 
     mpi_meta_graph_def, tensor_or_op_name_to_replica_names = \
@@ -140,7 +139,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config, is_test,
         if export_graph:
             export_mpi_meta_graph(worker_id)
 
-        ckpt_hooks = build_ckpt_hooks(config.get_ckpt_config(is_test)) if worker_id == 0 else None
+        ckpt_hooks = build_ckpt_hooks(config.get_ckpt_config()) if worker_id == 0 else None
 
         sess_config = config.sess_config
         if sess_config is None:
@@ -148,7 +147,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config, is_test,
         sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
         with tf.train.MonitoredTrainingSession(
                 is_chief=True,
-                checkpoint_dir=config.get_ckpt_config(is_test).ckpt_dir if worker_id == 0 else None,
+                checkpoint_dir=config.get_ckpt_config().ckpt_dir if worker_id == 0 else None,
                 # TODO: Allow user-defined hooks
                 hooks=None,
                 chief_only_hooks=ckpt_hooks,
@@ -163,18 +162,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config, is_test,
                 "Finished initialization process, start training on worker %d"
                 % worker_id)
 
-            if is_test:
-                parallax_log.debug('warmup is started')
-                run(sess, NUM_ITERATIONS_FOR_WARMUP,
-                    tensor_or_op_name_to_replica_names, num_workers,
-                    worker_id, 1)
-                parallax_log.debug('warmup is ended')
-
             start_time = time.time()
-            run(sess, config.num_iterations(is_test), tensor_or_op_name_to_replica_names,
+            run(sess, config.num_iterations(), tensor_or_op_name_to_replica_names,
                 num_workers, worker_id, 1)
             end_time = time.time()
-
-            if is_test:
-                send_execution_time(config.resource_info['master'][0], worker_id,
-                                    end_time - start_time)

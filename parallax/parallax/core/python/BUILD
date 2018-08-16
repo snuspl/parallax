@@ -13,6 +13,7 @@ native.py_library(
         "//parallax/core/python/common:common",
         "//parallax/core/python/mpi:mpi",
         "//parallax/core/python/ps:ps",
+        "//parallax/core/python/hybrid:hybrid",
         "//parallax/core/python/tools:tools",
     ],
 )

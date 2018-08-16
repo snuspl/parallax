@@ -101,7 +101,7 @@ PARALLAX_PREFIX = u"AutoParallel-"
 PARALLAX_REPLICA_PREFIX = u"%sReplica-" % PARALLAX_PREFIX
 MIRROR_VARIABLE_INIT_OP = "auto_parallel_replicated_var_init_op"
 BINARY_ENCODED_COLOCATION_PREFIX = b"loc:@"
-
+PARALLAX_GLOBAL_GRADS = 'PARALLAX_GLOBAL_GRADS'
 
 def parallax_replica_prefix(replica_id):
     return '%s%s' % (PARALLAX_REPLICA_PREFIX, str(replica_id))
@@ -111,7 +111,7 @@ def _get_op_name(tensor_name):
     return tensor_name.replace('^', '').split(':')[0]
 
 
-def _get_consumers(op):
+def get_consumers(op):
     # get a flat list from [output[0].consumers(), output[1].consumers(), ...]
     return [consumer for output in op.outputs
             for consumer in output.consumers()]
@@ -158,7 +158,7 @@ def get_ancestors(start_ops, end_ops=[], include_control_inputs=False):
         if curr_op in end_ops:
             continue
         queue.extend([input.op for input in curr_op.inputs])
-        consumers = _get_consumers(curr_op)
+        consumers = get_consumers(curr_op)
         if include_control_inputs:
             queue.extend([op for op in curr_op.control_inputs])
     return ancestor_ops
@@ -179,7 +179,7 @@ def _place_post_grad_agg_ops(ps_device,
             agg_grad_descendant_ops.add(curr_op)
             if curr_op in apply_grad_ops:
                 continue
-            curr_op_consumers = _get_consumers(curr_op)
+            curr_op_consumers = get_consumers(curr_op)
             queue.extend(curr_op_consumers)
         return agg_grad_descendant_ops
 
@@ -209,7 +209,7 @@ def _place_post_grad_agg_ops(ps_device,
                 if is_parent_to_child:
                     # do not care about ops not required for applying gradients
                     queue.extend(
-                        [consumer for consumer in _get_consumers(curr_op)
+                        [consumer for consumer in get_consumers(curr_op)
                          if consumer in apply_grad_ancestor_ops])
                 else:
                     queue.extend([input.op for input in curr_op.inputs])
@@ -221,7 +221,7 @@ def _place_post_grad_agg_ops(ps_device,
                 placement_reference_ops = placement_reference_ops.difference(
                     ancestors_diff_descendants)
             else:
-                placement_reference_ops = set(_get_consumers(curr_op))
+                placement_reference_ops = set(get_consumers(curr_op))
                 placement_reference_ops = placement_reference_ops.intersection(
                     apply_grad_ancestor_ops)
 
@@ -274,7 +274,7 @@ def _place_post_grad_agg_ops(ps_device,
                 if is_parent_to_child:
                     # do not care about ops not required for applying gradients
                     queue.extend(
-                        [consumer for consumer in _get_consumers(curr_op)
+                        [consumer for consumer in get_consumers(curr_op)
                          if consumer in apply_grad_ancestor_ops])
                 else:
                     queue.extend([input.op for input in curr_op.inputs])
@@ -550,7 +550,7 @@ def add_sync_op(worker_id,
                 finish_op = tf.group(*queue_ops)
 
             # Exceptional case: add additional dependencies for global_step
-            if var_op == global_step_op and not is_chief:
+            if not is_chief:
                 # Chief worker's finish_op already has update_op
                 # as control input
                 deps = [finish_op]
@@ -573,7 +573,6 @@ def add_sync_op(worker_id,
         update_control_consumers(op_to_control_consumer_ops[var_update_op],
                                   var_update_op, finish_op)
         _replace_update_op_with_read_op(var_op, var_update_op, finish_op)
-
 
 def replicate_variables_to_devices(meta_graph_def,
                                     worker_device,
@@ -807,7 +806,7 @@ def get_pipeline_ops(ops):
                 pipeline_ops.add(queue_runner.close_op)
                 pipeline_ops.add(queue_runner.cancel_op)
             elif curr_op.type in ITERATOR_OP_TYPES:
-                consumer_ops = _get_consumers(curr_op)
+                consumer_ops = get_consumers(curr_op)
                 stage_enqueue_iterator_ops_queue.extend(consumer_ops)
             else:
                 raise RuntimeError("Should not reach here")
@@ -1279,3 +1278,646 @@ def update_shard_info_for_in_graph(meta_graph_def, num_replicas):
                 updated_lib.function.extend([func])
 
         meta_graph_def.graph_def.library.CopyFrom(updated_lib)
+
+def set_boundary_between_workers_and_servers():
+  parallax_log.debug('set_boundary_between_workers_and_servers')
+  target_op_types = ['Slice', 'Gather', 'L2Loss', 'Size']
+  def _move_op(job_to_move, op):
+    for inp in op.inputs:
+        skip = False
+        for colocation_group in inp.op.colocation_groups():
+            assert colocation_group.startswith(\
+                BINARY_ENCODED_COLOCATION_PREFIX)
+            current_binding_op_name = \
+                colocation_group[len(BINARY_ENCODED_COLOCATION_PREFIX):]\
+                .decode("ascii")
+            current_binding_op = tf.get_default_graph()\
+                .get_operation_by_name(current_binding_op_name)
+            if current_binding_op != inp.op and tf.DeviceSpec.from_string(current_binding_op.device).job == job_to_move:
+              skip = True
+              break
+
+        if skip:
+          continue
+        if tf.DeviceSpec.from_string(inp.op.device).job == job_to_move:
+          if ((inp.op.type == 'Cast' and inp.op.inputs[0].dtype.size < inp.op.outputs[0].dtype.size)):
+              parallax_log.debug('inp op : %s, %s -> %s' % (inp.op.name, inp.op.device, op.device))
+              inp.op._set_device(op.device)
+
+    for i in range(len(op.outputs)):
+        for consumer in op.outputs[i].consumers():
+          skip = False
+          for colocation_group in consumer.colocation_groups():
+                assert colocation_group.startswith(\
+                    BINARY_ENCODED_COLOCATION_PREFIX)
+                current_binding_op_name = \
+                   colocation_group[len(BINARY_ENCODED_COLOCATION_PREFIX):]\
+                   .decode("ascii")
+                current_binding_op = tf.get_default_graph()\
+                    .get_operation_by_name(current_binding_op_name)
+                if current_binding_op != consumer and tf.DeviceSpec.from_string(current_binding_op.device).job == job_to_move:
+                  skip = True
+                  break
+
+          if skip:
+            continue
+    
+          if tf.DeviceSpec.from_string(consumer.device).job == job_to_move:
+              if ((consumer.type == 'Cast' and consumer.inputs[0].dtype.size > consumer.outputs[0].dtype.size) or
+                 (consumer.type in target_op_types)):
+                 parallax_log.debug('consumer op : %s, %s -> %s' % (consumer.name, consumer.device, op.device))
+                 consumer._set_device(op.device)
+
+  for op in tf.get_default_graph().get_operations():
+    device = tf.DeviceSpec.from_string(op.device)
+    if device.job == 'worker':
+      job_to_move = 'ps'
+    else:
+      job_to_move = 'worker'
+    _move_op(job_to_move, op)
+
+def add_aggregate_gradients_ops_only_between(multi_gpu_meta_graph_def,
+                                             op_names_to_replicate,
+                                             op_to_control_consumer_ops,
+                                             gradient_info_list,
+                                             num_replicas,
+                                             average_option,
+                                             local_chief_id,
+                                             num_local_worker,
+                                             only_sparse,
+                                             local_aggregation):
+    def _get_aggregated_dense_grad(var_op, grad):
+        grad_op_name = grad.op.name
+        grad_op = tf.get_default_graph().get_operation_by_name(
+            ops.prepend_name_scope(grad_op_name,
+                                   parallax_replica_prefix(0)))
+        grad = grad_op.outputs[0]
+        with tf.device('/job:worker/task:%d/device:CPU:0' % local_chief_id):
+            grad_accum = tf.ConditionalAccumulator(
+                grad.dtype,
+                shape=var_op.outputs[0].get_shape(),
+                shared_name=var_op.name + "/grad_accum")
+            # Get a copy of consumers list before creating accum_apply_op
+            grad_consumers = [c for c in grad.consumers()]
+            accum_apply_op = grad_accum.apply_grad(
+                grad, local_step=MAX_INT64,
+                name=grad.op.name + '_accum_apply_grad')
+            with tf.control_dependencies([accum_apply_op]):
+                agg_grad = grad_accum.take_grad(num_local_worker,
+                                                name=var_op.name + '_take_grad')
+
+        return agg_grad, accum_apply_op
+
+    def _get_aggregated_sparse_grad(var_op, indices_name, values_name,
+                                    dense_shape_name):
+        indices_op_name = _get_op_name(indices_name)
+        values_op_name = _get_op_name(values_name)
+        dense_shape_op_name = _get_op_name(dense_shape_name)
+        indices_output_idx = int(indices_name.split(':')[1])
+        values_output_idx = int(values_name.split(':')[1])
+        dense_shape_output_idx = int(dense_shape_name.split(':')[1])
+        assert indices_op_name in op_names_to_replicate
+        assert values_op_name in op_names_to_replicate
+        assert dense_shape_op_name in op_names_to_replicate
+        indices_ops = [tf.get_default_graph().get_operation_by_name(
+            ops.prepend_name_scope(indices_op_name, parallax_replica_prefix(i)))
+            for i in range(num_replicas)]
+        values_ops = [tf.get_default_graph().get_operation_by_name(
+            ops.prepend_name_scope(values_op_name, parallax_replica_prefix(i)))
+            for i in range(num_replicas)]
+        dense_shape_ops = [tf.get_default_graph().get_operation_by_name(
+            ops.prepend_name_scope(dense_shape_op_name,
+                                   parallax_replica_prefix(i)))
+            for i in range(num_replicas)]
+        indexed_slices_grads = [tf.IndexedSlices(
+            values_op.outputs[values_output_idx],
+            indices_op.outputs[indices_output_idx],
+            dense_shape_op.outputs[dense_shape_output_idx])
+            for indices_op, values_op, dense_shape_op
+            in zip(indices_ops, values_ops, dense_shape_ops)]
+        # Aggregate gradients on CPU
+        with tf.device('/job:worker/task:%d/device:CPU:0' % local_chief_id):
+            grad_accum_op_name = \
+                ops.prepend_name_scope(values_op_name,
+                                       u"%sAccum" % PARALLAX_PREFIX)
+            grad_accum = tf.SparseConditionalAccumulator(
+                dtype=indexed_slices_grads[0].values.dtype,
+                shape=var_op.outputs[0].shape,
+                shared_name=grad_accum_op_name,
+                name=grad_accum_op_name)
+            accum_apply_ops = [grad_accum.apply_indexed_slices_grad(
+                indexed_slices_grads[i],
+                MAX_INT64,
+                name=ops.prepend_name_scope(
+                        values_op_name,
+                        u"%s-Accum-Apply" % parallax_replica_prefix(i)))
+                        for i in range(num_replicas)]
+            take_grad_op_name = ops.prepend_name_scope(
+                values_op_name,
+                u"%sTake-Grad" % PARALLAX_PREFIX)
+            with tf.control_dependencies(accum_apply_ops):
+                take_grad = grad_accum.take_indexed_slices_grad(
+                    num_local_worker,
+                    average_option=average_option,
+                    name=take_grad_op_name)
+            new_indices = take_grad.indices
+            new_values = take_grad.values
+            new_dense_shape = take_grad.dense_shape
+            if indexed_slices_grads[0].indices.dtype != new_indices.dtype:
+                new_indices = tf.cast(
+                    new_indices,
+                    indexed_slices_grads[0].indices.dtype,
+                    name=ops.prepend_name_scope(
+                        values_op_name,
+                        u"%sTake-Grad-Cast-Indices" % PARALLAX_PREFIX)
+                )
+            if indexed_slices_grads[0].dense_shape.dtype \
+                    != new_dense_shape.dtype:
+                new_dense_shape = tf.cast(
+                    new_dense_shape,
+                    indexed_slices_grads[0].dense_shape.dtype,
+                    name=ops.prepend_name_scope(
+                        values_op_name,
+                        u"%sTake-Grad-Cast-Shape" % PARALLAX_PREFIX)
+                )
+        return tf.IndexedSlices(new_values, new_indices, new_dense_shape)
+
+    def _update_gradient_consumers(consumer_op_names, control_consumer_op_names,
+                                   old_tensor_name, new_tensor):
+        graph = tf.get_default_graph()
+        consumer_ops = [graph.get_operation_by_name(name)
+                        for name in consumer_op_names]
+        control_consumer_ops = [graph.get_operation_by_name(name)
+                                for name in control_consumer_op_names]
+        # Gradient consumers are currently using gradient generated
+        # from replica 0
+        old_op_name = _get_op_name(old_tensor_name)
+        replica_0_op_name = ops.prepend_name_scope(
+            old_op_name,
+            parallax_replica_prefix(0))
+        output_idx = int(old_tensor_name.split(':')[1])
+        replica_0_op = graph.get_operation_by_name(replica_0_op_name)
+        replica_0_tensor = replica_0_op.outputs[output_idx]
+        update_consumers(consumer_ops, replica_0_tensor, new_tensor)
+        update_control_consumers(control_consumer_ops, replica_0_tensor.op,
+                                  new_tensor.op)
+
+    with tf.Graph().as_default() as graph:
+        tf.train.import_meta_graph(multi_gpu_meta_graph_def)
+
+        # Aggregate grads
+        for gradient_info in gradient_info_list:
+            var_op = gradient_info._target.op
+            grad = gradient_info._grad
+            if only_sparse and isinstance(grad, tf.Tensor):
+                grad_op_name = grad.op.name
+                grad_op = tf.get_default_graph().get_operation_by_name(
+                    ops.prepend_name_scope(grad_op_name,
+                                           parallax_replica_prefix(0)))
+                agg_grad = grad_op.outputs[0]
+                #gi = GradientsInfo(gradient_info._target, grad)
+                #tf.add_to_collection(tf.GraphKeys.GRADIENTS_INFO, gi)
+                #continue
+            elif isinstance(grad, tf.Tensor):
+                agg_grad, accum_apply_op = _get_aggregated_dense_grad(var_op, grad)
+                cc_names = [c.name for c in op_to_control_consumer_ops[grad.op]]
+                c_names = [c.name for c in grad.consumers()]
+                _update_gradient_consumers(
+                    c_names,
+                    cc_names,
+                    grad.name,
+                    agg_grad)
+            elif isinstance(grad, tf.IndexedSlices):
+                indices_name, values_name, dense_shape_name = \
+                    (grad.indices.name, grad.values.name, grad.dense_shape.name)
+                if local_aggregation:
+                    agg_grad = _get_aggregated_sparse_grad(
+                        var_op, indices_name, values_name, dense_shape_name)
+
+                    indices_cc_names = [c.name for c in op_to_control_consumer_ops[grad.indices.op]]
+                    values_cc_names = [c.name for c in op_to_control_consumer_ops[grad.values.op]]
+                    indices_c_names = [c.name for c in grad.indices.consumers()]
+                    values_c_names = [c.name for c in grad.values.consumers()]
+                    _update_gradient_consumers(
+                        indices_c_names,
+                        indices_cc_names,
+                        indices_name,
+                        agg_grad.indices)
+                    _update_gradient_consumers(
+                        values_c_names,
+                        list(set(values_cc_names).difference(indices_cc_names)),
+                        values_name,
+                        agg_grad.values)
+                else:
+                    def _get_tensor_with_prefix(tensor_name):
+                        return tf.get_default_graph().get_tensor_by_name(ops.prepend_name_scope(tensor_name, parallax_replica_prefix(0)))
+                    agg_grad = tf.IndexedSlices(_get_tensor_with_prefix(values_name),
+                                                _get_tensor_with_prefix(indices_name),
+                                                _get_tensor_with_prefix(dense_shape_name))
+            else:
+                raise RuntimeError("Incorrect grad.")
+
+            gi = GradientsInfo(var_op.outputs[0], agg_grad)
+            tf.add_to_collection(tf.GraphKeys.GRADIENTS_INFO, gi)
+
+        return tf.train.export_meta_graph()
+
+def add_sync_op_only_between(worker_id,
+                             local_worker_id,
+                             machine_id,
+                             num_local_workers,
+                             num_worker_machines,
+                             master_var_op_to_mirror_vars,
+                             ps_device,
+                             worker_device,
+                             average_sparse,
+                             tensor_or_op_name_to_replica_names,
+                             only_sparse,
+                             local_aggregation):
+    """Adds additional ops needed for synchronous distributed training into
+    current graph.
+    Main purpose of additional ops are:
+    1. Initialization
+    2. Synchronization
+    3. Gradient aggregation
+    Args:
+        worker_id: The worker id
+        num_workers: Total number of workers to synchronize
+        master_var_op_to_mirror_vars: The dictionary of master variable op name
+            -> list of replicated variables, could be None
+        worker_device : The worker device string
+        average_sparse: Whether to average sparse values or not.
+    Returns:
+        None
+    """
+
+    def _get_accum_apply_and_agg_grad(var, grad, indices, dense_shape):
+        var_op = var.op
+        num_required = num_worker_machines if local_aggregation else num_worker_machines * num_local_workers
+        if indices is None:
+            assert False # hybrid does not use this function
+            grad_accum = tf.ConditionalAccumulator(
+                grad.dtype,
+                shape=var_op.outputs[0].get_shape(),
+                shared_name=var_op.name + "/grad_accum")
+            # Get a copy of consumers list before creating accum_apply_op
+            grad_consumers = [c for c in grad.consumers()]
+            accum_apply_op = grad_accum.apply_grad(
+                grad, local_step=MAX_INT64,
+                name=grad.op.name + '_accum_apply_grad')
+            agg_grad = grad_accum.take_grad(num_worker_machines,
+                                            name=var_op.name + '_take_grad')
+            with tf.device(var_op.device):
+                global_grad = tf.get_variable(
+                    grad.op.name +'_global_grad',
+                    dtype=grad.dtype,
+                    initializer=var.initial_value,
+                    trainable=False)
+                assign_global_grad_buf = global_grad.assign(agg_grad)
+                assign_global_grad_buf = [assign_global_grad_buf.op]
+            read_gg = global_grad.read_value()
+            global_grad_read_ops = [read_gg.op]
+            update_consumers(grad_consumers, grad, read_gg)
+            update_control_consumers(op_to_control_consumer_ops[grad.op],
+                                      grad.op, global_grad.op)
+        else:
+            grad_indexed_slices = tf.IndexedSlices(values=grad, indices=indices,
+                                                   dense_shape=dense_shape)
+            grad_accum = tf.SparseConditionalAccumulator(
+                grad.dtype,
+                shape=var_op.outputs[0].get_shape(),#grad.shape,
+                shared_name=var_op.name + "/grad_accum")
+            # Get a copy of consumers list before creating accum_apply_op
+            indices_consumers = [c for c in indices.consumers()]
+            grad_consumers = [c for c in grad.consumers()]
+            accum_apply_op = grad_accum.apply_indexed_slices_grad(
+                grad_indexed_slices, local_step=MAX_INT64,
+                name=grad.op.name + '_accum_apply_grad')
+            average_option = SPARSE_NO_AVERAGE
+            if average_sparse:
+                average_option = SPARSE_AVERAGE_BY_COUNTER
+            agg_grad = grad_accum.take_indexed_slices_grad(
+                num_required, average_option=average_option,
+                name=var_op.name + '_take_grad')
+            agg_indices = agg_grad.indices
+            if indices.dtype != agg_grad.indices.dtype:
+                agg_indices = tf.cast(agg_grad.indices, indices.dtype)
+
+            with tf.device(var_op.device):
+                global_grad_values = tf.get_variable(
+                    grad.op.name +'_parallax_global_grad_values',
+                    shape=(14,),
+                    dtype=agg_grad.values.dtype,
+                    initializer=tf.zeros_initializer(),
+                    trainable=False,
+                    validate_shape=False)
+                global_grad_indices = tf.get_variable(
+                    grad.op.name + '_parallax_global_grad_indices',
+                    shape=(14,),
+                    dtype=agg_indices.dtype,
+                    initializer=tf.zeros_initializer(),
+                    trainable=False,
+                    validate_shape=False)
+                global_grad_dense_shape = tf.get_variable(
+                    grad.op.name + '_parallax_global_grad_dense_shape',
+                    shape=(14,),
+                    dtype=agg_grad.dense_shape.dtype,
+                    initializer=tf.zeros_initializer(),
+                    trainable=False,
+                    validate_shape=False)
+
+                assign_global_grad_values = tf.assign(global_grad_values, agg_grad.values, validate_shape=False)
+                assign_global_grad_indices = tf.assign(global_grad_indices, agg_indices, validate_shape=False)
+                assign_global_grad_dense_shape = tf.assign(global_grad_dense_shape, agg_grad.dense_shape, validate_shape=False)
+                assign_global_grad_buf = [assign_global_grad_values.op, assign_global_grad_indices.op, assign_global_grad_dense_shape.op]
+                for var in [global_grad_values, global_grad_indices, global_grad_dense_shape]:
+                    tf.add_to_collection(PARALLAX_GLOBAL_GRADS, var)
+ 
+                grad_update_sync_queues = \
+                        [tf.FIFOQueue(1, [tf.bool], shapes=[[]],
+                              name='auto_parallel_%s_update_sync_queue_%d'
+                                   % (var_op.name, i),
+                              shared_name='auto_parallel_%s'
+                                          '_update_sync_queue_%d'
+                                          % (global_grad_values.name, i))
+                        for i in range(num_worker_machines * num_local_workers)]
+                token = tf.constant(False)
+                queue_ops = []
+                if worker_id == 0:
+                  with tf.control_dependencies(assign_global_grad_buf):
+                    for i,q in enumerate(grad_update_sync_queues):
+                      if i != worker_id:
+                         queue_ops.append(q.enqueue(token))
+                else:
+                    queue_ops.append(grad_update_sync_queues[worker_id].dequeue())
+                  
+            agg_grad = tf.IndexedSlices(values=global_grad_values,
+                                        indices=global_grad_indices,
+                                        dense_shape=global_grad_dense_shape)
+
+            assert isinstance(agg_grad, tf.IndexedSlices)
+            with tf.control_dependencies(queue_ops):
+                read_gg_indices = global_grad_indices.read_value()
+                read_gg_values = global_grad_values.read_value()
+            global_grad_read_ops = [read_gg_indices.op, read_gg_values.op]
+            update_consumers(indices_consumers, indices, read_gg_indices)
+            update_consumers(grad_consumers, grad, read_gg_values)
+            update_control_consumers(op_to_control_consumer_ops[indices.op],
+                                      indices.op, global_grad_indices.op)
+            update_control_consumers(op_to_control_consumer_ops[grad.op],
+                                      grad.op, global_grad_values.op)
+        return accum_apply_op, tf.IndexedSlices(read_gg_indices, read_gg_values), assign_global_grad_buf, \
+               queue_ops
+
+    def _get_mirror_variable_update_ops(master_var_op_to_mirror_vars,
+                                        grad_apply_finished, var):
+        with tf.device(this_worker_cpu):
+            with tf.control_dependencies(grad_apply_finished):
+                updated_value = var.read_value()
+        update_ops = []
+        for mirror_var in master_var_op_to_mirror_vars[var.op]:
+            with tf.device(mirror_var.device):
+                update_ops.append(mirror_var.assign(updated_value))
+        return update_ops
+
+    def _replace_update_op_with_read_op(var_op, var_update_op, finish_op):
+
+        var_update_consumers = [c for c in var_update_op.outputs[0].consumers()]
+        for consumer in var_update_consumers:
+            parallax_log.debug(
+                'var: %s, var_update : %s, consumer : %s'
+                % (var_op.name, var_update_op.name, consumer.name))
+            assert consumer.type not in all_var_update_op_types
+
+        # TODO: exploit locality: read updated value from mirror
+        with tf.control_dependencies([finish_op]):
+            with tf.device(var_op.device):
+                updated_var_value = global_var_op_to_var[var_op].read_value()
+
+        update_consumers(var_update_consumers, var_update_op.outputs[0],
+                          updated_var_value)
+        tensor_or_op_name_to_replica_names.update_mapping_from_tensor(
+            var_update_op.outputs[0], updated_var_value)
+
+    this_worker_cpu = tf.DeviceSpec.from_string(worker_device)
+    this_worker_cpu.device_type = 'CPU'
+    this_worker_cpu.device_index = 0
+    is_chief = worker_id == 0
+    is_local_chief = local_worker_id == 0
+
+    trainable_var_op_to_var = \
+        dict([(var.op, var)
+              for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)])
+    global_var_op_to_var = \
+        dict([(var.op, var)
+              for var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)])
+    op_to_control_consumer_ops = \
+        get_all_control_consumers(tf.get_default_graph())
+
+    var_op_to_agg_grad = {}
+    var_op_to_accum_apply_op = {}
+    var_op_to_sync_deps = {}
+    var_op_to_global_grad_read_ops = {}
+    # Aggregate gradients from different workers using ConditionalAccumulator.
+    # var_op_to_agg_grad and var_op_to_accum_apply_op are updated.
+    for gradients_info in tf.get_collection(tf.GraphKeys.GRADIENTS_INFO):
+        # grad_tensor == local aggregated gradients
+        grad_tensor = gradients_info._grad
+        target_tensor = gradients_info._target
+        if isinstance(grad_tensor, tf.Tensor) and only_sparse:
+            continue
+
+        if target_tensor.op not in trainable_var_op_to_var:
+            parallax_log.debug(
+                "Gradient for non-trainable variable %s is created, "
+                "do not insert accumulator for aggregating this gradient"
+                % target_tensor.op.name)
+            continue
+        var_op = target_tensor.op
+        #parallax_log.info(var_op.name)
+        if isinstance(grad_tensor, tf.Tensor):
+            grad = grad_tensor
+            indices = None
+            dense_shape = None
+        else:
+            grad = grad_tensor.values
+            indices = grad_tensor.indices
+            dense_shape = grad_tensor.dense_shape
+        with tf.device(var_op.device), tf.name_scope(""):
+            accum_apply_op, agg_grad, assign_global_grad_buf,\
+             global_grad_sync_ops = \
+                _get_accum_apply_and_agg_grad(target_tensor, grad, indices,
+                                              dense_shape)
+        gradients_info._grad = agg_grad
+        if indices == None:
+            var_op_to_agg_grad[var_op] = (None, agg_grad)
+        else:
+            var_op_to_agg_grad[var_op] = (agg_grad.indices, agg_grad.values)
+
+        var_op_to_accum_apply_op[var_op] = accum_apply_op
+        if is_local_chief:
+            var_op_to_sync_deps[var_op] = [accum_apply_op] + global_grad_sync_ops
+        else:
+            if not local_aggregation:
+                var_op_to_sync_deps[var_op] = grad_tensor.op.control_inputs +\
+                    reduce(lambda s, x: s + x.op.control_inputs,
+                           grad_tensor.op.inputs, []) + global_grad_sync_ops + [accum_apply_op]
+            else:
+                var_op_to_sync_deps[var_op] = grad_tensor.op.control_inputs +\
+                    reduce(lambda s, x: s + x.op.control_inputs,
+                           grad_tensor.op.inputs, []) + global_grad_sync_ops
+        if is_chief:
+            var_op_to_sync_deps[var_op].extend(assign_global_grad_buf)
+    global_step_op = tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0].op
+    assert len(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)) == 1
+
+    var_op_to_finish_op = {}
+    trainable_var_op_to_update_op = {}
+    non_trainable_var_op_to_update_op = {}
+    all_var_update_op_types = sparse_var_update_op_types.keys() \
+        + dense_var_update_op_types.keys()
+
+    for op in tf.get_default_graph().get_operations():
+        # Find variable update ops
+        if not op.type in all_var_update_op_types:
+            continue
+
+        var_update_op = op
+        var_op = var_update_op.inputs[UPDATE_OP_VAR_POS].op
+        if var_op not in global_var_op_to_var \
+                or var_update_op == global_var_op_to_var[var_op].initializer:
+            continue
+
+        assert var_op not in trainable_var_op_to_update_op
+        assert var_op not in non_trainable_var_op_to_update_op
+
+        if var_op in trainable_var_op_to_var:
+            trainable_var_op_to_update_op[var_op] = var_update_op
+            is_trainable = True
+        else:
+            non_trainable_var_op_to_update_op[var_op] = var_update_op
+            is_trainable = False
+
+        # Even if only_sparse, update ops for dense vars are inserted to
+        # trainable_var_op_to_update_op or non_trainable_var_op_to_update_op.
+        if only_sparse and op.type not in sparse_var_update_op_types.keys():
+            continue
+
+        queue_ops = []
+        with tf.device(var_op.device), tf.name_scope(""):
+            var_update_global_sync_queues = \
+                [tf.FIFOQueue(1, [tf.bool], shapes=[[]],
+                              name='auto_parallel_%s_update_sync_queue_%d'
+                                   % (var_op.name, i),
+                              shared_name='auto_parallel_%s'
+                                          '_update_sync_queue_%d'
+                                          % (var_op.name, i))
+                 for i in range(num_worker_machines)]
+            if is_chief:
+                if is_trainable:
+                    var_update_deps = \
+                        var_op_to_sync_deps[var_op] + [var_update_op]
+                else:
+                    var_update_deps = [var_update_op]
+                # Chief enqueues tokens to all other workers
+                # after executing variable update
+                token = tf.constant(False)
+                with tf.control_dependencies(var_update_deps):
+                    for i, q in enumerate(var_update_global_sync_queues):
+                            queue_ops.append(q.enqueue(token))
+
+        local_chief_id = worker_id - local_worker_id
+        with tf.device('/job:worker/task:%d/cpu:0' % local_chief_id):
+            var_update_local_sync_queues = \
+                [tf.FIFOQueue(1, [tf.bool], shapes=[[]],
+                              name='auto_parallel_%s_update_local_sync_queue_%d'
+                                   % (var_op.name, i),
+                              shared_name='auto_parallel_%s'
+                                          '_update_local_sync_queue_%d'
+                                          % (var_op.name, i))
+                 for i in range(num_local_workers)]
+            if is_local_chief:
+                if is_trainable:
+                    var_update_deps = \
+                        var_op_to_sync_deps[var_op] \
+                        + [var_update_global_sync_queues[machine_id].dequeue()]
+                else:
+                    var_update_deps = \
+                        [var_update_global_sync_queues[machine_id].dequeue()]
+                # Chief enqueues tokens to all other workers
+                # after executing variable update
+                token = tf.constant(False)
+                with tf.control_dependencies(var_update_deps):
+                    for i, q in enumerate(var_update_local_sync_queues):
+                        if i != local_worker_id:
+                            queue_ops.append(q.enqueue(token))
+                        else:
+                            queue_ops.append(tf.no_op())
+            else:
+                # wait for execution of var_update_op
+                if is_trainable:
+                    with tf.control_dependencies(
+                            var_op_to_sync_deps[var_op]):
+                        dequeue = var_update_local_sync_queues[local_worker_id]\
+                            .dequeue()
+                else:
+                    dequeue = var_update_local_sync_queues[local_worker_id]\
+                        .dequeue()
+                queue_ops.append(dequeue)
+
+            # Only dense trainable variables are replicated locally
+            if master_var_op_to_mirror_vars is not None \
+                    and var_op in master_var_op_to_mirror_vars:
+                mirror_variable_update_ops = _get_mirror_variable_update_ops(
+                    master_var_op_to_mirror_vars,
+                    queue_ops,
+                    trainable_var_op_to_var[var_op])
+                with tf.device(this_worker_cpu):
+                    finish_op = tf.group(*mirror_variable_update_ops)
+            else:
+                finish_op = tf.group(*queue_ops)
+
+            if var_op == global_step_op:
+                global_step_update_op = var_update_op
+
+        with tf.device(var_op.device), tf.name_scope(""):
+            # Exceptional case: add additional dependencies for global_step
+            if var_op == global_step_op and not is_chief:
+                # Chief worker's finish_op already has update_op
+                # as control input
+                deps = [finish_op]
+                deps.extend([inp.op for inp in var_update_op.inputs])
+                deps.extend([inp for inp in var_update_op.control_inputs])
+                finish_op = tf.group(*deps)
+            var_op_to_finish_op[var_op] = finish_op
+
+        #for read_op in var_op_to_global_grad_read_ops[var_op]:
+        #    if is_chief:
+        #        read_op.control_inputs.extend(#var_op_to_sync_deps[var_op])
+        #        read_op._recompute_node_def()
+        #    else:
+        #        read_op.control_inputs.append(finish_op)
+        #        read_op._recompute_node_def()
+
+    # Place computation ops of aggregated gradients on PS
+    #_place_post_grad_agg_ops(tf.DeviceSpec.from_string(ps_device),
+    #                         var_op_to_agg_grad, trainable_var_op_to_update_op)
+
+    # Replace variable update op with finish_op (control input)
+    # or read_op (input)
+    for var_op, finish_op in var_op_to_finish_op.items():
+        if var_op in trainable_var_op_to_update_op:
+            var_update_op = trainable_var_op_to_update_op[var_op]
+        else:
+            var_update_op = non_trainable_var_op_to_update_op[var_op]
+        update_control_consumers(op_to_control_consumer_ops[var_update_op],
+                                  var_update_op, finish_op)
+        _replace_update_op_with_read_op(var_op, var_update_op, finish_op)
+    var_op_to_agg_grad_ = {}
+    for key in var_op_to_agg_grad:
+      var_op_to_agg_grad_[key.name] = (var_op_to_agg_grad[key][0].name, var_op_to_agg_grad[key][1].name)
+    trainable_var_op_to_update_op_ = {}
+    for key in trainable_var_op_to_update_op:
+      trainable_var_op_to_update_op_[key.name] = trainable_var_op_to_update_op[key].name    
+    return var_op_to_agg_grad_, trainable_var_op_to_update_op_
+
