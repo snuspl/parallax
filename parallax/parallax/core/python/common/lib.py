@@ -139,9 +139,11 @@ def parse_resource_info(path, run_option):
         for machine_info in file:
             machines.extend(_parse_machine_info(machine_info.strip()))
 
-    num_worker_ports = 1 if run_option != 'HYBRID' or len(gpus) == 0  else len(gpus)
     ps = [{'hostname': hostname, 'port': _get_empty_port(hostname, 1), 'gpus': []} for hostname, _ in machines]
-    worker = [{'hostname': hostname, 'port': _get_empty_port(hostname, num_worker_ports), 'gpus': gpus} for hostname, gpus in machines]
+    worker = [{'hostname': hostname, 
+               'port': _get_empty_port(hostname, 1 if run_option != 'HYBRID' \
+                   or len(gpus) == 0 else len(gpus)), 'gpus': gpus} \
+                       for hostname, gpus in machines]
 
     resource_info = {'ps': ps, 'worker': worker}
     parallax_log.info(resource_info)
