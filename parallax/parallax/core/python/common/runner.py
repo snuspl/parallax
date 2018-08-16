@@ -112,7 +112,7 @@ def parallel_run(single_gpu_graph,
     parallax_log.info('parallel_run(%s)', parallax_run_option)
 
     if parallax_run_option == PARALLAX_RUN_MASTER:
-      resource_info = parse_resource_info(resource_info)
+      resource_info = parse_resource_info(resource_info, run_option)
     else:
       parallax_log.info('resource %s', os.getenv(PARALLAX_RESOURCE_INFO))
       resource_info = deserialize_resource_info(os.getenv(PARALLAX_RESOURCE_INFO))
