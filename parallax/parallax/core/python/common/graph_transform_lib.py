@@ -550,7 +550,7 @@ def add_sync_op(worker_id,
                 finish_op = tf.group(*queue_ops)
 
             # Exceptional case: add additional dependencies for global_step
-            if not is_chief:
+            if var_op == global_step_op and not is_chief:
                 # Chief worker's finish_op already has update_op
                 # as control input
                 deps = [finish_op]
@@ -1881,8 +1881,7 @@ def add_sync_op_only_between(worker_id,
                 global_step_update_op = var_update_op
 
         with tf.device(var_op.device), tf.name_scope(""):
-            # Exceptional case: add additional dependencies for global_step
-            if var_op == global_step_op and not is_chief:
+            if not is_chief:
                 # Chief worker's finish_op already has update_op
                 # as control input
                 deps = [finish_op]
@@ -1890,18 +1889,6 @@ def add_sync_op_only_between(worker_id,
                 deps.extend([inp for inp in var_update_op.control_inputs])
                 finish_op = tf.group(*deps)
             var_op_to_finish_op[var_op] = finish_op
-
-        #for read_op in var_op_to_global_grad_read_ops[var_op]:
-        #    if is_chief:
-        #        read_op.control_inputs.extend(#var_op_to_sync_deps[var_op])
-        #        read_op._recompute_node_def()
-        #    else:
-        #        read_op.control_inputs.append(finish_op)
-        #        read_op._recompute_node_def()
-
-    # Place computation ops of aggregated gradients on PS
-    #_place_post_grad_agg_ops(tf.DeviceSpec.from_string(ps_device),
-    #                         var_op_to_agg_grad, trainable_var_op_to_update_op)
 
     # Replace variable update op with finish_op (control input)
     # or read_op (input)
