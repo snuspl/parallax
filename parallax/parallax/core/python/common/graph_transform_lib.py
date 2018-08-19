@@ -1718,6 +1718,7 @@ def add_sync_op_only_between(worker_id,
     var_op_to_accum_apply_op = {}
     var_op_to_sync_deps = {}
     var_op_to_global_grad_read_ops = {}
+    sparse_var_ops = []
     # Aggregate gradients from different workers using ConditionalAccumulator.
     # var_op_to_agg_grad and var_op_to_accum_apply_op are updated.
     for gradients_info in tf.get_collection(tf.GraphKeys.GRADIENTS_INFO):
@@ -1743,6 +1744,7 @@ def add_sync_op_only_between(worker_id,
             grad = grad_tensor.values
             indices = grad_tensor.indices
             dense_shape = grad_tensor.dense_shape
+            sparse_var_ops.append(var_op)
         with tf.device(var_op.device), tf.name_scope(""):
             accum_apply_op, agg_grad, assign_global_grad_buf,\
              global_grad_sync_ops = \
@@ -1800,7 +1802,7 @@ def add_sync_op_only_between(worker_id,
 
         # Even if only_sparse, update ops for dense vars are inserted to
         # trainable_var_op_to_update_op or non_trainable_var_op_to_update_op.
-        if only_sparse and op.type not in sparse_var_update_op_types.keys():
+        if only_sparse and var_op not in sparse_var_ops:
             continue
 
         queue_ops = []
@@ -1881,7 +1883,7 @@ def add_sync_op_only_between(worker_id,
                 global_step_update_op = var_update_op
 
         with tf.device(var_op.device), tf.name_scope(""):
-            if not is_chief:
+            if var_op == global_step_op and not is_chief:
                 # Chief worker's finish_op already has update_op
                 # as control input
                 deps = [finish_op]

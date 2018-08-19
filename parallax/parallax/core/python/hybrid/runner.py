@@ -31,6 +31,11 @@ from parallax.core.python.hybrid.graph_transform import graph_transform_hybrid
 from parallax.core.python.ps.runner import launch_ps
 
 def create_mpi_script(driver_path, args, hostname, gpus, resource_info, machine_id, port=22):
+    cmd = 'ssh -p %d %s "mkdir -p %s"' % (port, hostname, REMOTE_PARALLAX_ROOT)
+    parallax_log.warning(colored('\n$ %s' % cmd, 'red'))
+    proc = subprocess.Popen(args=cmd, shell=True)
+    proc.wait()
+
     cmd_run = 'python %s %s' % (driver_path, ' '.join(args))
 
     try:
@@ -104,6 +109,7 @@ def launch_hybrid_driver(driver_path, args, config):
     mpi_command = config.communication_config.mpi_config.mpirun_options
     hybrid_cmd = _get_hybrid_cmd(workers, protocol, redirect_path, mpi_command)
 
+    processes = []
     print(colored('\n$ %s' % hybrid_cmd, 'red'))
     proc = subprocess.Popen(args=hybrid_cmd, shell=True)
 
@@ -111,9 +117,11 @@ def launch_hybrid_driver(driver_path, args, config):
     for ps_id in range(len(pss)):
         ps_proc, ps_logs = \
             launch_ps(ps_id, config)
-        
+        processes.append(ps_proc)
+
     def cleanup(recv_signal, frame):
-        os.killpg(os.getpgid(chief_worker_process.pid), signal.SIGINT)
+        for process in processes:
+            os.killpg(os.getpgid(process.pid), signal.SIGINT)
 
     signal.signal(signal.SIGINT, cleanup)
     return proc, cleanup

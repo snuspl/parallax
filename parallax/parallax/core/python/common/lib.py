@@ -146,7 +146,6 @@ def parse_resource_info(path, run_option):
                        for hostname, gpus in machines]
 
     resource_info = {'ps': ps, 'worker': worker}
-    parallax_log.info(resource_info)
     return resource_info
 
 
@@ -173,7 +172,6 @@ def deserialize_resource_info(resource_info_serialized):
     for type_machine in type_machines:
         type, machines = type_machine.split('_')
         resource_info[type] = deserialize_machines(machines)
-    parallax_log.info(resource_info)
     return resource_info
 
 
@@ -283,8 +281,9 @@ def get_tf_clusterspec(resource_info):
         hosts = resource_info[job]
         tf_cluster_dict[job] = []
         for host in hosts:
-            tf_cluster_dict[job].append(
-                '%s:%d' % (host['hostname'], host['port'][0]))
+            for port in host['port']:
+                tf_cluster_dict[job].append(
+                    '%s:%d' % (host['hostname'], port))
     cluster_spec = tf.train.ClusterSpec(tf_cluster_dict)
     return cluster_spec
 

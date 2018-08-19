@@ -286,7 +286,6 @@ def graph_transform_hybrid(single_gpu_meta_graph_def,
     cluster_info = config.resource_info
     this_worker = None
     for w in cluster_info['worker']:
-        print(w)
         if w['hostname'] == hostname:
             this_worker = w
     num_worker_machines = len(cluster_info['worker'])
