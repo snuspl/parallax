@@ -30,6 +30,12 @@ flags.DEFINE_integer('save_ckpt_steps', None,
                      """Number of steps between two consecutive checkpoints""")
 flags.DEFINE_string('profile_dir', None, """Directory to save RunMetadata""")
 flags.DEFINE_string('profile_steps', None, """Comma separated porfile steps""")
+flags.DEFINE_boolean('local_aggregation', True,
+                     """Whether to use local aggregation or not""")
+flags.DEFINE_boolean('boundary_among_servers', True,
+                     """Whether to use operation placement among servers""")
+flags.DEFINE_boolean('boundary_between_workers_and_servers', True,
+                     """Whether to use operation placement between workers and servers""")
 FLAGS = flags.FLAGS
 
 def build_config():
@@ -37,7 +43,11 @@ def build_config():
     ckpt_config = parallax.CheckPointConfig(ckpt_dir=FLAGS.ckpt_dir,
                                             save_ckpt_steps=FLAGS.save_ckpt_steps)
     ps_config = parallax.PSConfig(replicate_variables=FLAGS.replicate_variables,
-                                  protocol=FLAGS.protocol)
+                                  protocol=FLAGS.protocol,
+                                  local_aggregation=FLAGS.local_aggregation,
+                                  boundary_among_servers=FLAGS.boundary_among_servers,
+                                  boundary_between_workers_and_servers=\
+                                  FLAGS.boundary_between_workers_and_servers)
     mpi_config = parallax.MPIConfig(use_allgatherv=FLAGS.use_allgatherv,
                                     mpirun_options=FLAGS.mpirun_options)
     parallax_config = parallax.Config()

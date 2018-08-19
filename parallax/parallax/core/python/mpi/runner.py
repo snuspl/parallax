@@ -161,15 +161,6 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config,
                 "Created MonitoredTrainingSession for worker %d" % worker_id)
             _init_global_vars(sess)
             parallax_log.debug(
-<<<<<<< HEAD
-                "Finished initialization process, start training on worker %d"
-                % worker_id)
-
-            start_time = time.time()
-            run(sess, config.num_iterations(), tensor_or_op_name_to_replica_names,
-                num_workers, worker_id, 1)
-            end_time = time.time()
-=======
                 "Finished initialization process, start training on \
                  worker %d" % worker_id)
             step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
@@ -177,20 +168,8 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config,
                                         config.profile_config.profile_dir,
                                         config.profile_config.profile_steps):
 
-                if is_test:
-                    parallax_log.debug('warmup is started')
-                    run(sess, NUM_ITERATIONS_FOR_WARMUP,
-                        tensor_or_op_name_to_replica_names, num_workers,
-                        worker_id, 1)
-                    parallax_log.debug('warmup is ended')
-
                 start_time = time.time()
-                run(sess, config.num_iterations(is_test), 
+                run(sess, config.num_iterations(), 
                     tensor_or_op_name_to_replica_names,
                     num_workers, worker_id, 1)
                 end_time = time.time()
-
-            if is_test:
-                send_execution_time(config.resource_info['master'][0], worker_id,
-                                    end_time - start_time)
->>>>>>> master

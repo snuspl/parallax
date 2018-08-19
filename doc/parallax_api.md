@@ -31,6 +31,9 @@ ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect
 	* PSConfig
 		* protocol: Specifies the protocol to be used by the server. Acceptable values include `"grpc"`, `"grpc+gdr"`, `"grpc+verbs"`, etc. `"grpc"` is the default.
 		* replicate_variables: Each GPU has a copy of the variables, and updates its copy after the parameter servers are all updated with the gradients from all servers. Only works with `sync=True`.
+                * local_aggregation: If Ture, gradients are aggregated within a machine before sending them to servers.
+                * boundary_among_serves: Optimize operation placement among servers.
+                * boundary_between_workers_and_servers: Optimize operation placement between workers and servers.
 	* MPIConfig
 		* use_allgatherv: Specifies whether to utilize OpenMPI `allgatherv` instead of NCCL `allgather`. `use_allgatherv=False` is recommended by Parallax.
 		* mpirun_options: A string or list. Specifies the mpirun options, such as `-mca btl ^openib`. Empty string is the default.
@@ -46,7 +49,10 @@ Below code is an example of how to use **ParallaxConfig**.
 ckpt_config = parallax.CheckPointConfig(ckpt_dir=ckpt_dir,
                                         save_ckpt_steps=save_ckpt_steps)
 ps_config = parallax.PSConfig(replicate_variables=replicate_variables,
-                              protocol=protocol)
+                              protocol=protocol,
+                              local_aggregation=local_aggregation,
+                              boundary_among_serves=boundary_among_serves,
+                              boundary_between_workers_and_servers=boundary_between_workers_and_servers)
 mpi_config = parallax.MPIConfig(use_allgatherv=use_allgatherv,
                                 mpirun_options=mpirun_options)
 profile_config = parallax.ProfileConfig(profile_dir=/tmp/profile,
