@@ -103,6 +103,17 @@ class CheckPointConfig(object):
         self.save_ckpt_steps = save_ckpt_steps
         self.save_ckpt_secs = save_ckpt_secs
 
+class ProfileConfig(object):
+    def __init__(self,
+                 profile_dir=None,
+                 profile_steps=None):
+        """
+        Args:
+          profile_dir: The profile directory to store RunMetadata.
+          profile_steps: A list of steps when to store RunMetadata.
+        """
+        self.profile_dir = profile_dir
+        self.profile_steps = profile_steps
 
 class ParallaxConfig(object):
     def __init__(self,
@@ -111,7 +122,8 @@ class ParallaxConfig(object):
                  sess_config=None,
                  redirect_path=None,
                  communication_config=CommunicationConfig(),
-                 ckpt_config=CheckPointConfig()):
+                 ckpt_config=CheckPointConfig(),
+                 profile_config=ProfileConfig()):
         """Configurable options of Parallax.
 
         Args:
@@ -125,7 +137,7 @@ class ParallaxConfig(object):
           communication_config: A `CommunicationConfig` object to manage the
             configurations related to communication.
           ckpt_config: A `CheckPointConfig` object to manage the checkpoints
- 
+          profile_config: A `ProfileConfig` object to manage profile
         """
 
         self.run_option = run_option
@@ -135,6 +147,7 @@ class ParallaxConfig(object):
 
         self.communication_config = communication_config
         self.ckpt_config = ckpt_config
+        self.profile_config = profile_config
 
         self._sync = None
         self._num_iterations = None

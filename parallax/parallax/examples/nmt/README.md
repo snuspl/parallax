@@ -29,7 +29,6 @@ $ python nmt_distributed_driver.py \
     --train_prefix=/tmp/wmt16/train.tok.clean.bpe.32000 \
     --dev_prefix=/tmp/wmt16/newstest2013.tok.bpe.32000 \
     --test_prefix=/tmp/wmt16/newstest2015.tok.bpe.32000
-    --out_dir=/tmp/nmt_model
 ```
 
 For more options of nmt model command, please check out [https://github.com/tensorflow/nmt](https://github.com/tensorflow/nmt) again.
@@ -58,6 +57,5 @@ $ python nmt_distributed_driver.py \
     --train_prefix=/tmp/wmt16/train.tok.clean.bpe.32000 \
     --dev_prefix=/tmp/wmt16/newstest2013.tok.bpe.32000 \
     --test_prefix=/tmp/wmt16/newstest2015.tok.bpe.32000
-    --out_dir=/tmp/nmt_model \
     --run_option=MPI 
 ```

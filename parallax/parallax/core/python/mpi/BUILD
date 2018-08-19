@@ -22,6 +22,7 @@ native.py_library(
         "graph_transform",
         "//parallax/core/python/common:lib",
         "//parallax/core/python/common:consts",
+        "//parallax/core/python/common:session_context",
     ]
 )
 

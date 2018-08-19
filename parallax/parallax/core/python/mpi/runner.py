@@ -29,6 +29,7 @@ import horovod.tensorflow as hvd
 
 from parallax.core.python.common.lib import *
 from parallax.core.python.common.consts import *
+from parallax.core.python.common.session_context import ParallaxSessionContext
 from parallax.core.python.mpi.graph_transform import graph_transform_mpi
 
 def create_mpi_script(driver_path, args, hostname, gpus, port=22):
@@ -155,10 +156,12 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config,
                 save_summaries_steps=None,
                 save_summaries_secs=None,
                 config=sess_config) as sess:
+
             parallax_log.debug(
                 "Created MonitoredTrainingSession for worker %d" % worker_id)
             _init_global_vars(sess)
             parallax_log.debug(
+<<<<<<< HEAD
                 "Finished initialization process, start training on worker %d"
                 % worker_id)
 
@@ -166,3 +169,28 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config,
             run(sess, config.num_iterations(), tensor_or_op_name_to_replica_names,
                 num_workers, worker_id, 1)
             end_time = time.time()
+=======
+                "Finished initialization process, start training on \
+                 worker %d" % worker_id)
+            step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
+            with ParallaxSessionContext(step,
+                                        config.profile_config.profile_dir,
+                                        config.profile_config.profile_steps):
+
+                if is_test:
+                    parallax_log.debug('warmup is started')
+                    run(sess, NUM_ITERATIONS_FOR_WARMUP,
+                        tensor_or_op_name_to_replica_names, num_workers,
+                        worker_id, 1)
+                    parallax_log.debug('warmup is ended')
+
+                start_time = time.time()
+                run(sess, config.num_iterations(is_test), 
+                    tensor_or_op_name_to_replica_names,
+                    num_workers, worker_id, 1)
+                end_time = time.time()
+
+            if is_test:
+                send_execution_time(config.resource_info['master'][0], worker_id,
+                                    end_time - start_time)
+>>>>>>> master

@@ -73,6 +73,7 @@ def _parallax_run_master(single_gpu_meta_graph_def,
     try:
         if config.run_option == 'MPI' or \
             (config.run_option == 'HYBRID' and len(sparse_grads) == 0):
+
             process, cleanup = \
                     launch_mpi_driver(driver_path,
                                       args,

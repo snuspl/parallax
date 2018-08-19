@@ -28,6 +28,8 @@ flags.DEFINE_string('redirect_path', None, """redirect path to keep the log of d
 flags.DEFINE_string('ckpt_dir', None, """Directory to save checkpoints""")
 flags.DEFINE_integer('save_ckpt_steps', None,
                      """Number of steps between two consecutive checkpoints""")
+flags.DEFINE_string('profile_dir', None, """Directory to save RunMetadata""")
+flags.DEFINE_string('profile_steps', None, """Comma separated porfile steps""")
 FLAGS = flags.FLAGS
 
 def build_config():
@@ -43,6 +45,14 @@ def build_config():
     parallax_config.average_sparse = False
     parallax_config.communication_config = parallax.CommunicationConfig(ps_config, mpi_config)
     parallax_config.ckpt_config=ckpt_config
+    def get_profile_steps():
+        if not FLAGS.profile_steps:
+            return []
+        FLAGS.profile_steps = FLAGS.profile_steps.strip()
+        return [int(step) for step in FLAGS.profile_steps.split(',')]
+    profile_config = parallax.ProfileConfig(profile_dir=FLAGS.profile_dir,
+                                            profile_steps=get_profile_steps())
+    parallax_config.profile_config = profile_config
     parallax_config.redirect_path = FLAGS.redirect_path
 
     return parallax_config

@@ -32,6 +32,13 @@ native.py_library(
 )
 
 native.py_library(
+    name = "session_context",
+    srcs = ["session_context.py"],
+    deps = [
+    ]
+)
+
+native.py_library(
     name = "runner",
     srcs = ["runner.py"],
     deps = [
@@ -67,6 +74,7 @@ native.py_library(
         "runner",
         "shard",
         "config",
+        "session_context",
     ],
 )
 
