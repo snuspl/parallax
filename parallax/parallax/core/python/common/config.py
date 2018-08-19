@@ -96,7 +96,6 @@ class ProfileConfig(object):
     def __init__(self,
                  profile_dir=None,
                  profile_steps=None):
-    
         """
         Args:
           profile_dir: The profile directory to store RunMetadata.
@@ -129,7 +128,6 @@ class ParallaxConfig(object):
             configurations related to communication.
           ckpt_config: A `CheckPointConfig` object to manage the checkpoints
           profile_config: A `ProfileConfig` object to manage profile
-
         """
 
         self.run_option = run_option

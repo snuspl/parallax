@@ -39,7 +39,7 @@ ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect
 	* save_ckpt_steps: The frequency, in number of global steps, that a checkpoint is saved using a default checkpoint saver.
 	* save_ckpt_secs: The frequency, in seconds, that a checkpoint is saved using a default checkpoint saver.
 * profile_config: The configuration for profile. CUPTI library path (e.g., /usr/local/cuda/extras/CUPTI/lib64) needs to be added to LD_LIBRARY_PATH
-        * profile_dir: Then profile diretory to store RunMetadata.
+        * profile_dir: Then profile directory to store RunMetadata.
         * profile_steps: A list of steps when to store RunMetadata.
 Below code is an example of how to use **ParallaxConfig**.
 ```

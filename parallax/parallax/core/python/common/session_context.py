@@ -61,7 +61,7 @@ def _parallax_run(self,
 class ParallaxSessionContext(object):
     """A context that wraps session for Parallax.
        
-       This class references tf.contrib.tfprof.ProfileContext class.
+    This class references tf.contrib.tfprof.ProfileContext class.
 
     Args:
         profile_dir: Directory to store profiles.
