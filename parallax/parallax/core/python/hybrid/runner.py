@@ -82,7 +82,6 @@ def _get_hybrid_cmd(workers, protocol, redirect_path, mpi_cmd_in_config):
     mpi_cmd = 'mpirun -bind-to none -map-by slot' \
               ' -mca orte_base_help_aggregate 0'\
               ' -x NCCL_DEBUG=INFO'
-    mpi_cmd += mpi_cmd_in_config
     arg_runop = '-x %s=%s' % (PARALLAX_RUN_OPTION, PARALLAX_RUN_HYBRID)
     num_process = reduce(lambda s, x: s + len(x['gpus']), workers, 0)
     arg_np = '-np %d' % num_process
@@ -92,7 +91,7 @@ def _get_hybrid_cmd(workers, protocol, redirect_path, mpi_cmd_in_config):
     arg_script = 'bash %s' % REMOTE_MPI_SCRIPT_PATH
     std_err_redir = '2>&1'
 
-    mpi_cmd = ' '.join([mpi_cmd, arg_runop, arg_np, arg_host,
+    mpi_cmd = ' '.join([mpi_cmd, mpi_cmd_in_config, arg_runop, arg_np, arg_host,
                         arg_redir, arg_script, std_err_redir])
 
     return mpi_cmd
