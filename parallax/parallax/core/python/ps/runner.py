@@ -181,7 +181,8 @@ def launch_ps_driver(driver_path, args, config, is_test):
         processes.append(ps_proc)
 
     def cleanup_ps(recv_signal, frame):
-        os.killpg(os.getpgid(chief_worker_process.pid), signal.SIGINT)
+        for process in processes:
+            os.killpg(os.getpgid(process.pid), signal.SIGINT)
 
     signal.signal(signal.SIGINT, cleanup_ps)
     return chief_worker_process, logfiles, cleanup_ps

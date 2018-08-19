@@ -82,7 +82,7 @@ def _parallax_run_master(single_gpu_meta_graph_def,
 
             # kill processes if the chief worker receives average
             # exectution time using PS
-            os.killpg(os.getpgid(chief_worker_process.pid), signal.SIGINT)
+            cleanup(None, None)
 
             parallax_log.debug('mpi exec time : %d secs, \
                                ps exec time: %d secs'
