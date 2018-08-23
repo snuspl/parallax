@@ -47,6 +47,7 @@ native.py_library(
         "consts",
         "//parallax/core/python/ps:runner",
         "//parallax/core/python/mpi:runner",
+        "//parallax/core/python/hybrid:runner"
     ]
 )
 

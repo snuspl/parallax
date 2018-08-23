@@ -103,16 +103,19 @@ def _get_available_gpus(hostname):
     return list(range(len(result.strip().split('\n'))))
 
 
-def _get_empty_port(hostname):
+def _get_empty_port(hostname, num_ports):
     try:
         python_venv = os.environ['VIRTUAL_ENV']
     except:
         python_venv = None
 
-    proc = remote_exec('python -m ephemeral_port_reserve', hostname, stdout=subprocess.PIPE, python_venv=python_venv)
-    port = int(proc.stdout.readline())
-    proc.wait()
-    return port
+    ports = []
+    for i in range(num_ports):
+        proc = remote_exec('python -m ephemeral_port_reserve', hostname, stdout=subprocess.PIPE, python_venv=python_venv)
+        port = int(proc.stdout.readline())
+        proc.wait()
+        ports.append(port)
+    return ports
 
 
 def _parse_machine_info(machine_str):
@@ -130,38 +133,38 @@ def _parse_machine_info(machine_str):
     return [(hostname, gpus)]  # FIXME support in-graph and between-graph auto parallel
 
 
-def parse_resource_info(path):
+def parse_resource_info(path, run_option):
     machines = []
     with open(path) as file:
         for machine_info in file:
             machines.extend(_parse_machine_info(machine_info.strip()))
 
-    master_hostname, _ = machines[0]
-    master = {'hostname': master_hostname, 'port': _get_empty_port(master_hostname), 'gpus': []}
-    ps = [{'hostname': hostname, 'port': _get_empty_port(hostname), 'gpus': []} for hostname, _ in machines]
-    worker = [{'hostname': hostname, 'port': _get_empty_port(hostname), 'gpus': gpus} for hostname, gpus in machines]
+    ps = [{'hostname': hostname, 'port': _get_empty_port(hostname, 1), 'gpus': []} for hostname, _ in machines]
+    worker = [{'hostname': hostname, 
+               'port': _get_empty_port(hostname, 1 if run_option != 'HYBRID' \
+                   or len(gpus) == 0 else len(gpus)), 'gpus': gpus} \
+                       for hostname, gpus in machines]
 
-    resource_info = {'master': [master], 'ps': ps, 'worker': worker}
-    parallax_log.info(resource_info)
+    resource_info = {'ps': ps, 'worker': worker}
     return resource_info
 
 
 def serialize_resource_info(resource_info):
     def serialize_machine(m):
-        return '%s:%s:%s' % (m['hostname'], m['port'], ','.join([str(gpu) for gpu in m['gpus']]))
+        return '%s:%s:%s' % (m['hostname'], ','.join([str(port) for port in m['port']]), ','.join([str(gpu) for gpu in m['gpus']]))
     def serialize_machines(machines):
         return '+'.join([serialize_machine(m) for m in machines])
     return '^'.join(['%s_%s' % (type, serialize_machines(machines)) for type, machines in resource_info.iteritems()])
 
 
 def deserialize_resource_info(resource_info_serialized):
-    def deserialize_gpus(gpus):
-        if len(gpus) == 0:
+    def deserialize_list(list):
+        if len(list) == 0:
             return []
-        return [int(g) for g in gpus.split(',')]
+        return [int(g) for g in list.split(',')]
     def deserialize_machine(m):
-      hostname, port, gpus = m.split(':')
-      return {'hostname': hostname, 'port': int(port), 'gpus': deserialize_gpus(gpus)}
+      hostname, ports, gpus = m.split(':')
+      return {'hostname': hostname, 'port': deserialize_list(ports), 'gpus': deserialize_list(gpus)}
     def deserialize_machines(machines):
         return [deserialize_machine(m) for m in machines.split('+')]
     resource_info = {}
@@ -169,7 +172,6 @@ def deserialize_resource_info(resource_info_serialized):
     for type_machine in type_machines:
         type, machines = type_machine.split('_')
         resource_info[type] = deserialize_machines(machines)
-    parallax_log.info(resource_info)
     return resource_info
 
 
@@ -179,8 +181,13 @@ def get_cluster_str_for_hosts(hosts, with_slots):
             map(lambda host: '%s:%d' % (host['hostname'], len(host['gpus'])),
                 hosts))
     else:
+        host_list = []
+        for host in hosts:
+            for port in host['port']:
+              new_host = {'hostname': host['hostname'], 'port': port}
+              host_list.append(new_host)
         return ','.join(
-            map(lambda host: '%s:%d' % (host['hostname'], host['port']), hosts))
+            map(lambda host: '%s:%d' % (host['hostname'], host['port']), host_list))
 
 
 def send_execution_time(master, worker_id, exec_time):
@@ -251,11 +258,12 @@ def get_average_execution_time(master, num_workers):
 def export_mpi_meta_graph(worker_id):
     _export_meta_graph(worker_id, 'mpi', 'MPI')
 
-
 def export_ps_meta_graph(worker_id):
     _export_meta_graph(worker_id, 'ps', 'PS')
 
-
+def export_hybrid_meta_graph(worker_id):
+    _export_meta_graph(worker_id, 'hybrid', 'HYBRID')    
+ 
 def _export_meta_graph(worker_id, dir, tag):
     export_meta_graph_path = \
         os.path.join(REMOTE_PARALLAX_ROOT, dir,
@@ -273,8 +281,9 @@ def get_tf_clusterspec(resource_info):
         hosts = resource_info[job]
         tf_cluster_dict[job] = []
         for host in hosts:
-            tf_cluster_dict[job].append(
-                '%s:%d' % (host['hostname'], host['port']))
+            for port in host['port']:
+                tf_cluster_dict[job].append(
+                    '%s:%d' % (host['hostname'], port))
     cluster_spec = tf.train.ClusterSpec(tf_cluster_dict)
     return cluster_spec
 

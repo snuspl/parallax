@@ -23,6 +23,7 @@ def graph_transform_ps(single_gpu_meta_graph_def,
                        config,
                        op_library_path=None):
     cluster_info = config.resource_info
+    # TODO: Handle all ps configurations 
     if config.communication_config.ps_config.replicate_variables and not config.sync:
         raise ValueError('replicate_variables is only possible with sync')
     ps_device = '/job:ps' if 'ps' in cluster_info else '/job:worker/cpu:0'
