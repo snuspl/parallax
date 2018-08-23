@@ -23,7 +23,7 @@ ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect
                communication_config=CommunicationConfig(), ckpt_config=CheckPointConfig())
 ```
 
-* run_option:  A string(PS or MPI). If the option is None, the faster communication is selected automatically.
+* run_option:  A string(PS, MPI or HYBRID). The communication method for training.
 * average_sparse: A boolean. If True, sparse parameters are updated by the averaged gradients over all replicas. Otherwise, the sum of all gradients are used.
 * sess_config: The session configuration used in `tf.train.MonitoredTrainingSession`
 * redirect_path: A string. Optional path to redirect logs as files.
@@ -31,8 +31,8 @@ ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect
 	* PSConfig
 		* protocol: Specifies the protocol to be used by the server. Acceptable values include `"grpc"`, `"grpc+gdr"`, `"grpc+verbs"`, etc. `"grpc"` is the default.
 		* replicate_variables: Each GPU has a copy of the variables, and updates its copy after the parameter servers are all updated with the gradients from all servers. Only works with `sync=True`.
-                * local_aggregation: If Ture, gradients are aggregated within a machine before sending them to servers.
-                * boundary_among_serves: Optimize operation placement among servers.
+                * local_aggregation: If True, gradients are aggregated within a machine before sending them to servers.
+                * boundary_among_servers: Optimize operation placement among servers.
                 * boundary_between_workers_and_servers: Optimize operation placement between workers and servers.
 	* MPIConfig
 		* use_allgatherv: Specifies whether to utilize OpenMPI `allgatherv` instead of NCCL `allgather`. `use_allgatherv=False` is recommended by Parallax.
@@ -51,7 +51,7 @@ ckpt_config = parallax.CheckPointConfig(ckpt_dir=ckpt_dir,
 ps_config = parallax.PSConfig(replicate_variables=replicate_variables,
                               protocol=protocol,
                               local_aggregation=local_aggregation,
-                              boundary_among_serves=boundary_among_serves,
+                              boundary_among_servers=boundary_among_servers,
                               boundary_between_workers_and_servers=boundary_between_workers_and_servers)
 mpi_config = parallax.MPIConfig(use_allgatherv=use_allgatherv,
                                 mpirun_options=mpirun_options)
