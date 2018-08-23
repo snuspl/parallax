@@ -37,7 +37,7 @@ class PSConfig(object):
             `sync=True`.
           local_aggregation: Gradients are aggregated within a machine
             before sending them to servers.
-          boundary_among_serves: Optimize operation placement among
+          boundary_among_servers: Optimize operation placement among
             servers.
           boundary_between_workers_and_servers: Optimize operation 
             placement between workers and servers.
@@ -127,7 +127,8 @@ class ParallaxConfig(object):
         """Configurable options of Parallax.
 
         Args:
-          run_option: A string(PS, MPI or HYBRID).
+          run_option: A string(PS, MPI or HYBRID). The communication method 
+            for training. 
           average_sparse: A boolean. If True, sparse parameters are updated
             by the averaged gradients over all replicas. Otherwise,
             the sum of all gradients are used.
