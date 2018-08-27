@@ -86,7 +86,7 @@ def main(_):
             throughput = float(FLAGS.log_frequency) / float(end - start)
             parallax.log.info(
                 "global step: %d, loss: %f, throughput: %f steps/sec"
-                % (results['global_step'], results['cost'], throughput))
+                % (results['global_step'][0], results['cost'][0], throughput))
             start = time.time()
 
 if __name__ == '__main__':
