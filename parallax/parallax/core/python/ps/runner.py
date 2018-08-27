@@ -198,7 +198,7 @@ def _get_worker_info():
     return worker_id, num_workers
 
 
-def parallax_run_ps(single_gpu_meta_graph_def, run, config,
+def parallax_run_ps(single_gpu_meta_graph_def, config,
                     export_graph=True):
     worker_id, num_workers = _get_worker_info()
     num_replicas_per_worker = len(config.resource_info['worker'][worker_id]['gpus'])
@@ -233,7 +233,7 @@ def parallax_run_ps(single_gpu_meta_graph_def, run, config,
         sess_config = config.sess_config
         if sess_config is None:
             sess_config = tf.ConfigProto(allow_soft_placement=True)
-        with tf.train.MonitoredTrainingSession(
+        sess = tf.train.MonitoredTrainingSession(
                 master=session_target,
                 is_chief=(worker_id == 0),
                 checkpoint_dir=config.get_ckpt_config().ckpt_dir if worker_id == 0 else None,
@@ -243,25 +243,24 @@ def parallax_run_ps(single_gpu_meta_graph_def, run, config,
                 save_checkpoint_secs=None,
                 save_summaries_steps=None,
                 save_summaries_secs=None,
-                config=sess_config) as sess:
-            parallax_log.debug(
-                "Created MonitoredTrainingSession for worker %d on %s"
-                % (worker_id, session_target))
+                config=sess_config)
 
-            if replicated_var_init_op is not None:
-                sess.run(replicated_var_init_op)
+        parallax_log.debug(
+            "Created MonitoredTrainingSession for worker %d on %s"
+            % (worker_id, session_target))
 
-            parallax_log.debug(
-                "Finished initialization process, start training on worker %d"
-                % worker_id)
+        if replicated_var_init_op is not None:
+            sess.run(replicated_var_init_op)
 
-            step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
-            with ParallaxSessionContext(step,
-                                        config.profile_config.profile_dir,
-                                        config.profile_config.profile_steps):
-                start_time = time.time()
-                run(sess, config.num_iterations(), 
-                    tensor_or_op_name_to_replica_names,
-                    num_workers, worker_id, num_replicas_per_worker)
-                end_time = time.time()
+        parallax_log.debug(
+            "Finished initialization process, start training on worker %d"
+            % worker_id)
+
+        step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
+        sess_context = ParallaxSessionContext(step,
+                                              config.profile_config.profile_dir,
+                                              config.profile_config.profile_steps,
+                                              tensor_or_op_name_to_replica_names)
+        sess_context()
+        return sess, num_workers, worker_id, num_replicas_per_worker
 

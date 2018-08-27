@@ -59,7 +59,6 @@ def _get_grads(single_gpu_meta_graph_def):
     return sparse_grads, dense_grads
 
 def _parallax_run_master(single_gpu_meta_graph_def,
-                         run,
                          config):
 
     # Get caller's file path, have to find a better way for this.
@@ -103,9 +102,7 @@ def _parallax_run_master(single_gpu_meta_graph_def,
 
 
 def parallel_run(single_gpu_graph,
-                 run,
                  resource_info,
-                 num_iterations,
                  sync=True,
                  parallax_config=ParallaxConfig()):
     """Invokes the `run` function to run the `single gpu graph` on
@@ -117,10 +114,7 @@ def parallel_run(single_gpu_graph,
     Args:
       single_gpu_graph: A complete TensorFlow graph that can run on a
         single device.
-      run: A function which runs the transformed graph in a distributed
-        environment.
       resource_info: Path to the file that contains the resource information.
-      num_iterations: The number of iterations to be run on each worker.
       sync: The training method(synchronous/asynchronous).
         `True` is the default.
       parallax_config: `ParallaxConfig` object for tunning the behavior of
@@ -146,20 +140,19 @@ def parallel_run(single_gpu_graph,
       resource_info = deserialize_resource_info(os.getenv(PARALLAX_RESOURCE_INFO))
 
     parallax_config.set_sync(sync)
-    parallax_config.set_num_iterations(num_iterations)
     parallax_config.set_resource_info(resource_info)
 
     kwargs = {
         'single_gpu_meta_graph_def': single_gpu_meta_graph_def,
-        'run': run,
         'config': parallax_config,
     }
 
     if parallax_run_option == PARALLAX_RUN_MASTER:
         _parallax_run_master(**kwargs)
+        return None
     elif parallax_run_option == PARALLAX_RUN_MPI:
-        parallax_run_mpi(**kwargs)
+        return parallax_run_mpi(**kwargs)
     elif parallax_run_option == PARALLAX_RUN_PS:
-        parallax_run_ps(**kwargs)
+        return parallax_run_ps(**kwargs)
     elif parallax_run_option == PARALLAX_RUN_HYBRID:
-        parallax_run_hybrid(**kwargs)
+        return parallax_run_hybrid(**kwargs)
