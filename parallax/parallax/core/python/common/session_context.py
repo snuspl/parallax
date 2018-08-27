@@ -95,8 +95,8 @@ class ParallaxSessionContext(object):
     def _dump_profile(self, metadata, basename):
       if not tf.gfile.Exists(self._profile_dir):
           tf.gfile.MakeDirs(self._profile_dir)
-      with tf.gfile.Open(os.path.join(self._profile_dir, basename), 'w') as f:
-          f.write('%s' % metadata)
+      with tf.gfile.Open(os.path.join(self._profile_dir, basename), 'wb') as f:
+          f.write(metadata.SerializeToString())
 
     def __enter__(self):
       self.old_run = getattr(session.BaseSession, 'run', None)
