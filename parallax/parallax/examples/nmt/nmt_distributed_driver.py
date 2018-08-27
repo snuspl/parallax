@@ -51,12 +51,10 @@ def add_arguments(parser):
         help="total number of data instances")
 
 def before_train(train_model, train_sess, global_step, hparams, log_f,
-                 tensor_or_op_name_to_replica_names):
+                 num_replicas_per_worker):
     """Misc tasks to do before training."""
     stats = train.init_stats()
-    lr_name = train_model.model.learning_rate.name
-    assert len(tensor_or_op_name_to_replica_names[lr_name]) == 1
-    lr = train_sess.run(tensor_or_op_name_to_replica_names[lr_name][0])
+    lr = train_sess.run(train_model.model.learning_rate)[0]
     info = {"train_ppl": 0.0, "speed": 0.0, "avg_step_time": 0.0,
             "avg_grad_norm": 0.0,
             "learning_rate": lr}
@@ -67,17 +65,12 @@ def before_train(train_model, train_sess, global_step, hparams, log_f,
     # Initialize all of the iterators
     skip_count = hparams.batch_size * hparams.epoch_step
     utils.print_out("# Init train iterator, skipping %d elements" % skip_count)
-    skip_count_name = train_model.skip_count_placeholder.name
+    skip_count = train_model.skip_count_placeholder
     feed_dict = {}
-    num_skip_counts = len(tensor_or_op_name_to_replica_names[skip_count_name])
-    for i in range(num_skip_counts):
-        feed_dict[tensor_or_op_name_to_replica_names[skip_count_name][i]] = 0
+    feed_dict[skip_count] = [0 for i in range(num_replicas_per_worker)]
     initializers = []
-    init_name = train_model.iterator.initializer.name
-    num_initializers = len(tensor_or_op_name_to_replica_names[init_name])
-    for i in range(num_initializers):
-        initializers.append(tensor_or_op_name_to_replica_names[init_name][i])
-    train_sess.run(initializers, feed_dict=feed_dict)
+    init = train_model.iterator.initializer
+    train_sess.run(init, feed_dict=feed_dict)
     return stats, info, start_train_time
 
 def main(_):
@@ -116,8 +109,7 @@ def main(_):
         num_intra_threads=1,
         num_inter_threads=36)
 
-    def run(train_sess, num_iters, tensor_or_op_name_to_replica_names,
-            num_workers, worker_id, num_replicas_per_worker):
+    def run(train_sess, num_workers, worker_id, num_replicas_per_worker):
          
         # Random
         random_seed = FLAGS.random_seed
@@ -131,61 +123,44 @@ def main(_):
         log_f = tf.gfile.GFile(log_file, mode="a")
         utils.print_out("# log_file=%s" % log_file, log_f)
 
-        global_step = train_sess.run(train_model.model.global_step.name)
+        global_step = train_sess.run(train_model.model.global_step)[0]
         last_stats_step = global_step
 
         # This is the training loop.
         stats, info, start_train_time = before_train(
             train_model, train_sess, global_step, hparams, log_f,
-            tensor_or_op_name_to_replica_names)
+            num_replicas_per_worker)
 
         epoch_steps = FLAGS.epoch_size / (FLAGS.batch_size * num_workers * num_replicas_per_worker)
 
-        for i in range(num_iters):
+        for i in range(FLAGS.max_steps):
           ### Run a step ###
           start_time = time.time()
           if hparams.epoch_step !=0 and hparams.epoch_step % epoch_steps == 0:
               hparams.epoch_step  = 0
-              skip_count_name = train_model.skip_count_placeholder.name
+              skip_count = train_model.skip_count_placeholder
               feed_dict = {}
-              num_skip_counts = len(
-                  tensor_or_op_name_to_replica_names[skip_count_name])
-              for i in range(num_skip_counts):
-                  feed_dict[tensor_or_op_name_to_replica_names[\
-                      skip_count_name][i]] = 0
-              initializers = []
-              init_name = train_model.iterator.initializer.name
-              num_initializers = len(
-                  tensor_or_op_name_to_replica_names[init_name])
-              for i in range(num_initializers):
-                  initializers.append(tensor_or_op_name_to_replica_names[\
-                      init_name][i])
-              train_sess.run(initializers, feed_dict=feed_dict)
+              feed_dict[skip_count] = [0 for i in range(num_replicas_per_worker)]
+              init = train_model.iterator.initializer
+              train_sess.run(init, feed_dict=feed_dict)
 
           if worker_id == 0:
-              step_result = train_sess.run([\
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.update.name][0],
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.train_loss.name][0],
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.predict_count.name][0],
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.train_summary.name][0],
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.global_step.name][0],
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.word_count.name][0],
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.batch_size.name][0],
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.grad_norm.name][0],
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.learning_rate.name][0]])
+              results = train_sess.run([
+                  train_model.model.update,
+                  train_model.model.train_loss,
+                  train_model.model.predict_count,
+                  train_model.model.train_summary,
+                  train_model.model.global_step,
+                  train_model.model.word_count,
+                  train_model.model.batch_size,
+                  train_model.model.grad_norm,
+                  train_model.model.learning_rate])
+              step_result = [r[0] for r in results]
+
           else:
-              global_step = train_sess.run(
-                  tensor_or_op_name_to_replica_names[\
-                      train_model.model.update.name+':0'][0])
+              global_step, _ = train_sess.run(
+                  [train_model.model.global_step,
+                   train_model.model.update])
           hparams.epoch_step += 1
 
           if worker_id == 0:
@@ -206,12 +181,12 @@ def main(_):
                   # Reset statistics
                   stats = train.init_stats()
 
-    parallax.parallel_run(train_model.graph,
-                          run,
-                          FLAGS.resource_info_file,
-                          FLAGS.max_steps,
-                          sync=FLAGS.sync,
-                          parallax_config=parallax_config.build_config())
+    sess, num_workers, worker_id, num_replicas_per_worker = \
+        parallax.parallel_run(train_model.graph,
+                              FLAGS.resource_info_file,
+                              sync=FLAGS.sync,
+                              parallax_config=parallax_config.build_config())
+    run(sess, num_workers, worker_id, num_replicas_per_worker)
 
 if __name__ == "__main__":
     import logging
