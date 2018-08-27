@@ -31,8 +31,9 @@ def _parallax_run(self,
                   feed_dict=None,
                   options=None,
                   run_metadata=None):
-
+    
     fetches = self.parallax_session_context._convert_fetch(fetches)
+    feed_dict = self.parallax_session_context._convert_feed(feed_dict)
 
     if (self.parallax_session_context._profile_dir is None 
         or self.parallax_session_context._profile_steps is None):
@@ -113,6 +114,13 @@ class ParallaxSessionContext(object):
       with tf.gfile.Open(os.path.join(self._profile_dir, basename), 'w') as f:
           f.write('%s' % metadata)
 
+    def _read_converted_names(self, target):
+        if isinstance(target, compat.bytes_or_text_types):
+            target_name = target
+        else:
+            target_name = target.name
+        return self._replica_dict[target_name]
+     
     def _convert_fetch(self, fetch):
         if fetch is None:
             raise TypeError('Fetch argument %r has invalid type %r' % (fetch,
@@ -124,13 +132,6 @@ class ParallaxSessionContext(object):
             values = [self._convert_fetch(f) for f in fetch.values()]
             return dict(zip(keys, values))
         else:
-            def convert_as_fetchable(target):
-                if isinstance(target, compat.bytes_or_text_types):
-                    target_name = target
-                else:
-                    target_name = target.name
-                return self._replica_dict[target_name]
-
             if isinstance(fetch, tf.SparseTensor):
                 return [tf.SparseTensor(self._replica_dict[fetch.indices][i],
                                         self._replica_dict[fetch.values][i],
@@ -144,8 +145,28 @@ class ParallaxSessionContext(object):
                                 else self._replica_dict[fetch.indices][i]) 
                                for i in range(self._num_replicas_per_worker)]
             else:
-                return convert_as_fetchable(fetch)
+                return self._read_converted_names(fetch)
 
+    def _convert_feed(self, feed_dict):
+
+        def _feed_fn(feed):
+            for tensor_type, _, _, feed_fn in session._REGISTERED_EXPANSIONS:
+                if isinstance(feed, tensor_type):
+                    return feed_fn(feed)
+            raise TypeError('Feed argument %r has invalid type %r' % (feed,
+                                                                   type(feed)))
+        if not feed_dict:
+            return feed_dict
+        
+        if feed_dict:
+          new_feed_dict = {}
+          for feed, feed_val in feed_dict.items():
+              for subfeed in _feed_fn(feed):
+                  new_subfeeds = self._read_converted_names(subfeed)
+                  for i in range(self._num_replicas_per_worker):
+                    new_feed_dict[new_subfeeds[i]] = feed_val[i]
+          return new_feed_dict
+   
     def __call__(self):
       self.old_run = getattr(session.BaseSession, 'run', None)
       self.old_init = getattr(session.BaseSession, '__init__', None)

@@ -27,6 +27,7 @@ import horovod.tensorflow as hvd
 
 from parallax.core.python.common.lib import *
 from parallax.core.python.common.consts import *
+from parallax.core.python.common.session_context import ParallaxSessionContext
 from parallax.core.python.hybrid.graph_transform import graph_transform_hybrid
 from parallax.core.python.ps.runner import launch_ps
 
@@ -227,6 +228,7 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
             "Finished initialization process, start training on worker %d"
             % worker_id)
 
+        step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
         sess_context = \
             ParallaxSessionContext(step,
                                    config.profile_config.profile_dir,
