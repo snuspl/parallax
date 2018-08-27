@@ -260,7 +260,8 @@ def parallax_run_ps(single_gpu_meta_graph_def, config,
         sess_context = ParallaxSessionContext(step,
                                               config.profile_config.profile_dir,
                                               config.profile_config.profile_steps,
-                                              tensor_or_op_name_to_replica_names)
+                                              tensor_or_op_name_to_replica_names,
+                                              num_replicas_per_worker)
         sess_context()
         return sess, num_workers, worker_id, num_replicas_per_worker
 
