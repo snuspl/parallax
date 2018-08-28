@@ -107,35 +107,32 @@ def main(_):
 
     # init = tf.global_variables_initializer()
 
-  def run(sess, num_iters, op_name_to_replica_op_names,
-          num_workers, worker_id, num_replicas_per_worker):
+  def run(sess, num_workers, worker_id, num_replicas_per_worker):
     cursor = 0
-    for i in range(num_iters):
+    for i in range(1000):
       feed_dict = {}
-      for replica in range(num_replicas_per_worker):
-        feed_dict[op_name_to_replica_op_names[x.name][replica]] = \
-            train_x[cursor % num_samples]
-        feed_dict[op_name_to_replica_op_names[y.name][replica]] = \
-            train_y[cursor % num_samples]
-        cursor += 1
+      feed_dict[x] = [train_x[(cursor + j) % num_samples] for j in \
+          range(num_replicas_per_worker)]
+      feed_dict[y] = [train_y[(cursor + j) % num_samples] for j in \
+          range(num_replicas_per_worker)]
+      cursor += num_replicas_per_worker
       fetches = {
-          'global_step': op_name_to_replica_op_names[global_step.name][0],
-          'loss': loss.name,
-          'train_op': train_op.name
+          'global_step': global_step,
+          'loss': loss,
+          'train_op': train_op
       }
+
       results = sess.run(fetches, feed_dict=feed_dict)
 
       if i % 5 == 0:
         print("global step: %d, loss: %f"
-              % (results['global_step'], results['loss']))
-
-  # with tf.Session() as sess:
-  #   sess.run(init)
-  #   _run(sess, 100, {x: [x], y: [y], loss: loss, train_op: train_op}, 1)
+              % (results['global_step'][0], results['loss'][0]))
 
   resource_info = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                'resource_info')
-  parallax.parallel_run(single_gpu_graph, run, resource_info, 1000)
+  sess, num_workers, worker_id, num_replicas_per_worker = \
+      parallax.parallel_run(single_gpu_graph, resource_info)
+  run(sess, num_workers, worker_id, num_replicas_per_worker)
 
 if __name__ == '__main__':
   tf.app.run()

@@ -148,8 +148,8 @@ def parallel_run(single_gpu_graph,
     }
 
     if parallax_run_option == PARALLAX_RUN_MASTER:
-        _parallax_run_master(**kwargs)
-        return None
+         _parallax_run_master(**kwargs)
+         sys.exit()
     elif parallax_run_option == PARALLAX_RUN_MPI:
         return parallax_run_mpi(**kwargs)
     elif parallax_run_option == PARALLAX_RUN_PS:
