@@ -19,7 +19,8 @@ Below code is an example of a Parallax(TensorFlow) graph for a simple linear reg
 ```shell
 import tensorflow as tf
 
-with tf.Graph() as single_device_graph:
+single_device_graph = tf.Graph()
+with single_device_graph.as_default_graph():
   x_data = [1, 2, 3]
   y_data = [1, 2, 3]
 

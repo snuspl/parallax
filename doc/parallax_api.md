@@ -25,7 +25,8 @@ The returned `session` from `parallel_run` is almost similiar with session in Te
 
 Example (assume `num_replicas_per_worker` is 3)
 ```shell
-    with tf.Graph.as_default() as single_gpu_graph:'
+    single_gpu_graph = tf.Graph()
+    with single_gpu_graph.as_default():
       a = tf.placeholder(tf.float32, shape=[])
       x = tf.add(a, a)
       
