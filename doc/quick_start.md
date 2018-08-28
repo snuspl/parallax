@@ -36,33 +36,6 @@ with tf.Graph() as single_device_graph:
   train_op = optimizer.minimize(cost)
 ```
 
-## `run` Function
-Parallax allows flexible session call and logging as a normal TensorFlow application does. Users need to implement the `run` function as below.
-```shell
-def run(sess, num_iters, tensor_or_op_name_to_replica_names,
-        num_workers, worker_id, num_replicas_per_worker)
-```
-* sess : `session` which can run the distributed graph created by Parallax.
-* num_iters : The number of iterations to run. The number is received from the user but a different number can be used when comparing the throughput between PS and MPI.
-* tensor_or_op_name_to_replica_names: A dictionary that maps the name of an operator or a tensor in the original graph to a list of names in the transformed graph. For the parameter server, Parallax does not change the shared operators like parameters and the parameter update operators while the operators that are needed for gradients computations are replicated as many times as the number of GPUs with the names including replica prefixes. MPI style transformation keeps all the names of operators so that the list length is always one.
-* num_workers : The number of workers. It could be used for data partitioning or logging.
-* worker_id : The worker id. It could be used for data partitioning or logging.
-* num_replicas_per_worker: The number of replicas per worker. It could be used for data partitioning or logging.
-
-Below code snippet comes from [TensorFlow CNN Benchmark](https://github.com/snuspl/parallax/blob/master/parallax/parallax/examples/tf_cnn_benchmarks/CNNBenchmark_distributed_driver.py) example.
-```shell
-def run(sess, num_iters, tensor_or_op_name_to_replica_names,
-        num_workers, worker_id, num_replicas_per_worker):
-	fetches = {
-		'global_step':
-			tensor_or_op_name_to_replica_names[bench.global_step.name][0],
-		'cost': tensor_or_op_name_to_replica_names[bench.cost.name][0],
-		'train_op':
-			tensor_or_op_name_to_replica_names[bench.train_op.name][0],
-	}
-	fetched = sess.run(fetches)
-```
-
 ## Data Partitioning
 Parallax supports data parallelism, meaning that a disjoint subset of input data has to be assigned to each worker. The way of data processing is different according to the application. The way of data processing is different according to the application. The data processing could be defined as [dataset](https://www.tensorflow.org/api_docs/python/tf/data/Dataset) API, a python function, and operations in the graph. As a result, Parallax provides data partitioning for dataset API which is the simplest one, and utilizing other methods is possible as an additional option.
 
@@ -79,28 +52,22 @@ ds = ds.apply(
         tf.data.TFRecordDataset, cycle_length=10))
 ```
 
-### 2. Using run function and feed
-Some of the applications define input data as a placeholder, and feed them through TensorFlow session. In this case, you can utilize `num_workers`, `worker_id`, `num_replicas_per_worker` in the `run` function. This code snippet comes from [LM-1B](https://github.com/snuspl/parallax/blob/master/parallax/parallax/examples/lm1b/lm1b_distributed_driver.py) example.
+### 2. Feed and Fetch
+Some of the applications define input data as a placeholder, and feed them through TensorFlow session. In this case, you can utilize `num_workers`, `worker_id`, `num_replicas_per_worker` from the `parallax.paralle_run` function. This code snippet comes from [LM-1B](https://github.com/snuspl/parallax/blob/master/parallax/parallax/examples/lm1b/lm1b_distributed_driver.py) example.
+The value of feed dictionary must be a list as long as `num_replicas_per_worker`. Each element in the list is fed into a replica tensor in the distributed graph.
 
 ```shell
-def run(sess, num_iters, tensor_or_op_name_to_replica_names,
-        num_workers, worker_id, num_replicas_per_worker):
+def run(sess, num_workers, worker_id, num_replicas_per_worker):
 
         data_iterator = dataset.iterate_forever(FLAGS.batch_size * num_replicas_per_worker,
                                                 FLAGS.num_steps, num_workers, worker_id)
 
-        x_names = tensor_or_op_name_to_replica_names[model.x.name]
-        y_names = tensor_or_op_name_to_replica_names[model.y.name]
-        w_names = tensor_or_op_name_to_replica_names[model.w.name]
-        for local_step in range(num_iters):
+        for local_step in range(FLAGS.max_steps):
             x, y, w = next(data_iterator)
             feeds = {}
-            for replica_id in range(num_replicas_per_worker):
-                start_idx = FLAGS.batch_size * replica_id
-                end_idx = FLAGS.batch_size * (replica_id + 1)
-                feeds[x_names[replica_id]] = x[start_idx:end_idx]
-                feeds[y_names[replica_id]] = y[start_idx:end_idx]
-                feeds[w_names[replica_id]] = w[start_idx:end_idx]
+	    feeds[model.x] = np.split(x, num_replicas_per_worker)
+	    feeds[model.y] = np.split(y, num_replicas_per_worker)
+	    feeds[model.w] = np.split(w, num_replicas_per_worker)
             fetched = sess.run(fetches, feeds)
 ```
 ### 3. Embedding shard operators in the graph
