@@ -119,7 +119,10 @@ class ParallaxSessionContext(object):
             target_name = target
         else:
             target_name = target.name
-        return self._replica_dict[target_name]
+        if target_name in self._replica_dict:
+            return self._replica_dict[target_name]
+        else:
+            return target
      
     def _convert_fetch(self, fetch):
         if fetch is None:
