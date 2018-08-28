@@ -51,7 +51,8 @@ def main(_):
     vocab = Vocabulary.from_file(os.path.join(FLAGS.datadir, "1b_word_vocab.txt"))
     dataset = Dataset(vocab, os.path.join(FLAGS.datadir, "training-monolingual.tokenized.shuffled/*"))
 
-    with tf.Graph().as_default() as single_gpu_graph:
+    single_gpu_graph = tf.Graph()
+    with single_gpu_graph.as_default():
         with tf.variable_scope("model"):
             model = language_model_graph.build_model()
 

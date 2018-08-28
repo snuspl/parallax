@@ -59,7 +59,8 @@ def main(_):
     bench.print_info()
 
     # Build single-GPU benchmark_cnn model
-    with tf.Graph().as_default() as single_gpu_graph:
+    single_gpu_graph = tf.Graph()
+    with single_gpu_graph.as_default():
         bench.build_model()
 
     config = parallax_config.build_config()

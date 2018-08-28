@@ -46,7 +46,8 @@ tf.app.flags.DEFINE_integer('log_frequency', 100,
 tf.app.flags.DEFINE_boolean('sync', True, '')
 
 def main(_):
-    with tf.Graph().as_default() as single_gpu_graph:
+    single_gpu_graph = tf.Graph()
+    with single_gpu_graph.as_default():
         model_config = configuration.model_config(
             input_file_pattern=FLAGS.input_file_pattern,
             batch_size=FLAGS.batch_size)

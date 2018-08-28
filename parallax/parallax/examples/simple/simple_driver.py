@@ -91,7 +91,8 @@ num_samples = train_x.shape[0]
 
 
 def main(_):
-  with tf.Graph().as_default() as single_gpu_graph:
+  single_gpu_graph = tf.Graph()
+  with single_gpu_graph.as_default():
     global_step = tf.train.get_or_create_global_step()
     x = tf.placeholder(tf.float32, shape=(2))
     y = tf.placeholder(tf.float32, shape=(1))
