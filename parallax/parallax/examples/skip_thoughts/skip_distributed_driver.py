@@ -74,36 +74,33 @@ def main(_):
             global_step=model.global_step,
             clip_gradient_norm=training_config.clip_gradient_norm)
 
-    def run(sess, num_iters, tensor_or_op_name_to_replica_names,
-            num_workers, worker_id, num_replicas_per_worker):
+    def run(sess, num_workers, worker_id, num_replicas_per_worker):
         fetches = {
             'global_step':
-                tensor_or_op_name_to_replica_names[model.global_step.name][0],
+                model.global_step,
             'cost':
-                tensor_or_op_name_to_replica_names[model.total_loss.name][0],
+                model.total_loss,
             'train_op':
-                tensor_or_op_name_to_replica_names[train_tensor.name][0],
+                train_tensor,
         }
 
         start = time.time()
-        for i in range(num_iters):
+        for i in range(FLAGS.max_steps):
             results = sess.run(fetches)
             if i % FLAGS.log_frequency == 0:
                 end = time.time()
                 throughput = float(FLAGS.log_frequency) / float(end - start)
                 parallax.log.info(
                     "global step: %d, loss: %f, throughput: %f steps/sec"
-                    % (results['global_step'], results['cost'], throughput))
+                    % (results['global_step'][0], results['cost'][0], throughput))
                 start = time.time()
 
-    parallax.parallel_run(
-        single_gpu_graph,
-        run,
-        FLAGS.resource_info_file,
-        FLAGS.max_steps,
-        sync=FLAGS.sync,
-        parallax_config=parallax_config.build_config())
-
+    sess, num_workers, worker_id, num_replicas_per_worker = \
+        parallax.parallel_run(single_gpu_graph,
+                              FLAGS.resource_info_file,
+                              sync=FLAGS.sync,
+                              parallax_config=parallax_config.build_config())
+    run(sess, num_workers, worker_id, num_replicas_per_worker)
 
 if __name__ == "__main__":
     tf.logging.set_verbosity(tf.logging.INFO)
