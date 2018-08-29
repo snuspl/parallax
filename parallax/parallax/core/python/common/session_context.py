@@ -145,7 +145,7 @@ class ParallaxSessionContext(object):
                            self._replica_dict[fetch.values][i],
                            self._replica_dict[fetch.indices][i],
                            None if fetch.dense_shape is None \
-                                else self._replica_dict[fetch.indices][i]) 
+                                else self._replica_dict[fetch.dense_shape][i]) 
                                for i in range(self._num_replicas_per_worker)]
             else:
                 return self._read_converted_names(fetch)
@@ -164,10 +164,22 @@ class ParallaxSessionContext(object):
         if feed_dict:
           new_feed_dict = {}
           for feed, feed_val in feed_dict.items():
+              if isinstance(feed, compat.bytes_or_text_types):
+                  new_feeds = self._read_converted_names(feed) 
+                  if isinstance(new_feeds, list):
+                      for i in range(self._num_replicas_per_worker):
+                          new_feed_dict[new_feeds[i]] = feed_val[i]
+                  else:
+                      new_feed_dict[new_feeds] = feed_val
+                  continue
+
               for subfeed in _feed_fn(feed):
                   new_subfeeds = self._read_converted_names(subfeed)
-                  for i in range(self._num_replicas_per_worker):
-                    new_feed_dict[new_subfeeds[i]] = feed_val[i]
+                  if isinstance(new_subfeeds, list):
+                      for i in range(self._num_replicas_per_worker):
+                          new_feed_dict[new_subfeeds[i]] = feed_val[i]
+                  else:
+                      new_feed_dict[new_subfeeds] = feed_val
           return new_feed_dict
    
     def __call__(self):
