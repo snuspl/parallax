@@ -3,25 +3,25 @@ This document explains Parallax API in detail. If you are a beginner of Parallax
 
 ## parallel_run
 
-`parallel_run` transforms the `single_gpu_graph` in the distributed environment specified in the `resource_info` file with a specific communication method. This is either MPI, PS or HYBRID style communication. Then, it returns the `session` for running the transformed graph with `num_workers`, `worker_id` and `num_replicas_per_worker`
+`parallel_run` transforms the `single_gpu_graph` for the distributed environment specified in the `resource_info` file with a specific communication method. This is either MPI, PS or HYBRID style communication. Then, it returns the `session` for running the transformed graph with `num_workers`, `worker_id` and `num_replicas_per_worker`
 ``` shell
 def parallel_run(single_gpu_graph, resource_info,
                  sync=True, parallax_config=None)
 ```
-* Return
-  * session : Session similiar with TensorFlow session for running the graph of distributed version.
-  * num_workers : The total number of workers.
-  * worker_id : The worker id of the current process.
-  * num_replicas_per_worker: The number of replicas in a worker. The value is always one for MPI and HYBRID.              
-  
 * Args
   * single_gpu_graph: A complete TensorFlow graph that can run on a single device.
   * resource_info: A file which contains resource information.
   * sync: The training method(synchronous/asynchronous). `True` is the default.
   * [parallax_config](#parallaxconfig): The minor configuration for executing Parallax.
 
+* Returns
+  * session : Session, which is similiar to TensorFlow session, for running the graph of distributed version.
+  * num_workers : The total number of workers.
+  * worker_id : The worker id of the current process.
+  * num_replicas_per_worker: The number of replicas in a worker. The value is always one for MPI and HYBRID.
+
 ### Graph Execution
-The returned `session` from `parallel_run` is almost similiar with session in TensorFlow. You can feed and fetch values using operations/tensors or their names in the `single_gpu_graph`. However, the feed and fecth arguments are internally converted for distributed graph. For example, if you fetch `x` operation in the `single_gpu_graph`, the returned results will be a list of all the `x` operations in the worker. The length of the list is always same as the `num_replicas_per_worker`. Feeding is similiar with fetching so that you must pass a list with values as many as `num_replicas_per_worker`.
+The returned `session` from `parallel_run` is almost similiar with session in TensorFlow. You can feed and fetch values using operations/tensors or their names in the `single_gpu_graph`. However, the feed and fetch arguments are internally converted for distributed graph. For example, if you fetch `x` operation in the `single_gpu_graph`, the returned results will be a list of all the `x` operations in the worker. The length of the list is always the same as the `num_replicas_per_worker`. Feeding is similiar with fetching so that you must pass a list with values as many as `num_replicas_per_worker`.
 
 Example (assume `num_replicas_per_worker` is 3)
 ```shell

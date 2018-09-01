@@ -235,5 +235,5 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
                                    config.profile_config.profile_steps,
                                    tensor_or_op_name_to_replica_names,
                                    1)
-        sess_context()
+        sess_context.set_parallax_session_context()
         return sess, num_workers, worker_id, 1

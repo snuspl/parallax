@@ -66,13 +66,6 @@ class ParallaxSessionContext(object):
     """A context that wraps session for Parallax.
        
     This class references tf.contrib.tfprof.ProfileContext class.
-
-    Args:
-        profile_dir: Directory to store profiles.
-        profile_steps: A list of steps for tracing and saving as a file.
-        replica_dict : A dictionary to map old tensor(operation) name 
-            to new tensor(operation) names.
-        num_replicas_per_worker : Number of replicas per worker.
     """
    
     def __init__(self,
@@ -81,6 +74,15 @@ class ParallaxSessionContext(object):
                  profile_steps,
                  replica_dict,
                  num_replicas_per_worker):
+        """Constructs an `ParallaxSessionContext` instance.
+
+        Args:
+          profile_dir: Directory to store profiles.
+          profile_steps: A list of steps for tracing and saving as a file.
+          replica_dict : A dictionary to map old tensor(operation) name
+            to new tensor(operation) names.
+          num_replicas_per_worker : Number of replicas per worker.
+        """
 
         self._step = step
         self._profile_dir = profile_dir
@@ -158,31 +160,29 @@ class ParallaxSessionContext(object):
                     return feed_fn(feed)
             raise TypeError('Feed argument %r has invalid type %r' % (feed,
                                                                    type(feed)))
-        if not feed_dict:
-            return feed_dict
-        
         if feed_dict:
-          new_feed_dict = {}
-          for feed, feed_val in feed_dict.items():
-              if isinstance(feed, compat.bytes_or_text_types):
-                  new_feeds = self._read_converted_names(feed) 
-                  if isinstance(new_feeds, list):
-                      for i in range(self._num_replicas_per_worker):
-                          new_feed_dict[new_feeds[i]] = feed_val[i]
-                  else:
-                      new_feed_dict[new_feeds] = feed_val
-                  continue
-
-              for subfeed in _feed_fn(feed):
-                  new_subfeeds = self._read_converted_names(subfeed)
-                  if isinstance(new_subfeeds, list):
-                      for i in range(self._num_replicas_per_worker):
-                          new_feed_dict[new_subfeeds[i]] = feed_val[i]
-                  else:
-                      new_feed_dict[new_subfeeds] = feed_val
-          return new_feed_dict
+            new_feed_dict = {}
+            for feed, feed_val in feed_dict.items():
+                if isinstance(feed, compat.bytes_or_text_types):
+                    new_feeds = self._read_converted_names(feed)
+                    if isinstance(new_feeds, list):
+                        for i in range(self._num_replicas_per_worker):
+                            new_feed_dict[new_feeds[i]] = feed_val[i]
+                    else:
+                        new_feed_dict[new_feeds] = feed_val
+                else:
+                    for subfeed in _feed_fn(feed):
+                        new_subfeeds = self._read_converted_names(subfeed)
+                        if isinstance(new_subfeeds, list):
+                            for i in range(self._num_replicas_per_worker):
+                                new_feed_dict[new_subfeeds[i]] = feed_val[i]
+                        else:
+                            new_feed_dict[new_subfeeds] = feed_val
+            return new_feed_dict
+        else:
+            return feed_dict
    
-    def __call__(self):
+    def set_parallax_session_context(self):
       self.old_run = getattr(session.BaseSession, 'run', None)
       self.old_init = getattr(session.BaseSession, '__init__', None)
       if not self.old_run:

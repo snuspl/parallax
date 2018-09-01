@@ -54,7 +54,7 @@ ds = ds.apply(
 ```
 
 ### 2. Feed Placeholder
-Some of the applications define input data as a placeholder, and feed them through TensorFlow session. In this case, you can utilize `num_workers`, `worker_id`, `num_replicas_per_worker` from the `parallax.paralle_run` function. This code snippet comes from [LM-1B](https://github.com/snuspl/parallax/blob/master/parallax/parallax/examples/lm1b/lm1b_distributed_driver.py) example.
+Some of the applications define input data as a placeholder, and feed them through TensorFlow session. In this case, you can utilize `num_workers`, `worker_id`, `num_replicas_per_worker` from the `parallax.parallel_run` function. This code snippet comes from [LM-1B](https://github.com/snuspl/parallax/blob/master/parallax/parallax/examples/lm1b/lm1b_distributed_driver.py) example.
 The value of feed dictionary must be a list as long as `num_replicas_per_worker`. Each element in the list is fed into a replica tensor in the distributed graph.
 
 ```shell
