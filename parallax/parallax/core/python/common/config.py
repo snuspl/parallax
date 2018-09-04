@@ -151,7 +151,6 @@ class ParallaxConfig(object):
         self.profile_config = profile_config
 
         self._sync = None
-        self._num_iterations = None
         self._resource_info = None
 
     def get_ckpt_config(self):
@@ -163,12 +162,6 @@ class ParallaxConfig(object):
     @property
     def sync(self):
         return self._sync
-
-    def set_num_iterations(self, num_iterations):
-        self._num_iterations = num_iterations
-
-    def num_iterations(self):
-        return self._num_iterations
 
     def set_resource_info(self, resource_info):
         self._resource_info = resource_info

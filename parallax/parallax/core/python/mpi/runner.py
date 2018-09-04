@@ -126,7 +126,7 @@ def _init_global_vars(sess):
             sess.run(c)
 
 
-def parallax_run_mpi(single_gpu_meta_graph_def, run, config,
+def parallax_run_mpi(single_gpu_meta_graph_def, config,
                      export_graph=True):
 
     mpi_meta_graph_def, tensor_or_op_name_to_replica_names = \
@@ -146,7 +146,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config,
         if sess_config is None:
             sess_config = tf.ConfigProto(allow_soft_placement=True)
         sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
-        with tf.train.MonitoredTrainingSession(
+        sess = tf.train.MonitoredTrainingSession(
                 is_chief=True,
                 checkpoint_dir=config.get_ckpt_config().ckpt_dir if worker_id == 0 else None,
                 # TODO: Allow user-defined hooks
@@ -155,21 +155,20 @@ def parallax_run_mpi(single_gpu_meta_graph_def, run, config,
                 save_checkpoint_secs=None,
                 save_summaries_steps=None,
                 save_summaries_secs=None,
-                config=sess_config) as sess:
+                config=sess_config)
 
-            parallax_log.debug(
-                "Created MonitoredTrainingSession for worker %d" % worker_id)
-            _init_global_vars(sess)
-            parallax_log.debug(
-                "Finished initialization process, start training on \
-                 worker %d" % worker_id)
-            step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
-            with ParallaxSessionContext(step,
-                                        config.profile_config.profile_dir,
-                                        config.profile_config.profile_steps):
-
-                start_time = time.time()
-                run(sess, config.num_iterations(), 
-                    tensor_or_op_name_to_replica_names,
-                    num_workers, worker_id, 1)
-                end_time = time.time()
+        parallax_log.debug(
+            "Created MonitoredTrainingSession for worker %d" % worker_id)
+        _init_global_vars(sess)
+        parallax_log.debug(
+            "Finished initialization process, start training on \
+             worker %d" % worker_id)
+        step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
+        sess_context = \
+            ParallaxSessionContext(step,
+                                   config.profile_config.profile_dir,
+                                   config.profile_config.profile_steps,
+                                   tensor_or_op_name_to_replica_names,
+                                   1)
+        sess_context.set_parallax_session_context()
+        return sess, num_workers, worker_id, 1

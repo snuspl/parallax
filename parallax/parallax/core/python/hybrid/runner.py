@@ -27,6 +27,7 @@ import horovod.tensorflow as hvd
 
 from parallax.core.python.common.lib import *
 from parallax.core.python.common.consts import *
+from parallax.core.python.common.session_context import ParallaxSessionContext
 from parallax.core.python.hybrid.graph_transform import graph_transform_hybrid
 from parallax.core.python.ps.runner import launch_ps
 
@@ -165,7 +166,6 @@ def get_tf_clusterspec_for_hybrid(resource_info):
     return cluster_spec
 
 def parallax_run_hybrid(single_gpu_meta_graph_def,
-                        run,
                         config):
 
     # Initialize horovod
@@ -209,7 +209,7 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
             build_ckpt_hooks(config.get_ckpt_config()) \
             if worker_id == 0 else None
 
-        with tf.train.MonitoredTrainingSession(
+        sess = tf.train.MonitoredTrainingSession(
                 master=server.target,
                 is_chief=True,
                 checkpoint_dir=config.get_ckpt_config().ckpt_dir if worker_id == 0 else None,
@@ -219,14 +219,21 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
                 save_checkpoint_secs=None,
                 save_summaries_steps=None,
                 save_summaries_secs=None,
-                config=sess_config) as sess:
+                config=sess_config)
 
-            parallax_log.debug(
-                "Created MonitoredTrainingSession for worker %d" % worker_id)
-            _init_global_vars(sess)
-            parallax_log.debug(
-                "Finished initialization process, start training on worker %d"
-                % worker_id)
+        parallax_log.debug(
+            "Created MonitoredTrainingSession for worker %d" % worker_id)
+        _init_global_vars(sess)
+        parallax_log.debug(
+            "Finished initialization process, start training on worker %d"
+            % worker_id)
 
-            run(sess, config.num_iterations(), tensor_or_op_name_to_replica_names,
-                num_workers, worker_id, 1)
+        step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
+        sess_context = \
+            ParallaxSessionContext(step,
+                                   config.profile_config.profile_dir,
+                                   config.profile_config.profile_steps,
+                                   tensor_or_op_name_to_replica_names,
+                                   1)
+        sess_context.set_parallax_session_context()
+        return sess, num_workers, worker_id, 1

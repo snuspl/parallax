@@ -59,45 +59,36 @@ def main(_):
     bench.print_info()
 
     # Build single-GPU benchmark_cnn model
-    with tf.Graph().as_default() as single_gpu_graph:
+    single_gpu_graph = tf.Graph()
+    with single_gpu_graph.as_default():
         bench.build_model()
-
-    def run(sess, num_iters, tensor_or_op_name_to_replica_names,
-            num_workers, worker_id, num_replicas_per_worker):
-        fetches = {
-            'global_step':
-                tensor_or_op_name_to_replica_names[bench.global_step.name][0],
-            'cost': tensor_or_op_name_to_replica_names[bench.cost.name][0],
-            'train_op':
-                tensor_or_op_name_to_replica_names[bench.train_op.name][0],
-        }
-        if isinstance(bench.lr, tf.Tensor):
-          fetches['lr'] = tensor_or_op_name_to_replica_names[bench.lr.name][0]
-
-        start = time.time()
-        for i in range(num_iters):
-            results = sess.run(fetches)
-            if i % FLAGS.log_frequency == 0:
-                end = time.time()
-                throughput = float(FLAGS.log_frequency) / float(end - start)
-                parallax.log.info(
-                    "global step: %d, lr: %f, loss: %f, "
-                    "throughput: %f steps/sec"
-                    % (results['global_step'], results['lr'] if 'lr' in results else bench.lr, results['cost'],
-                       throughput))
-                start = time.time()
 
     config = parallax_config.build_config()
     config.sess_config = sess_config
 
-    parallax.parallel_run(
-        single_gpu_graph,
-        run,
-        FLAGS.resource_info_file,
-        FLAGS.max_steps,
-        sync=FLAGS.sync,
-        parallax_config=config)
+    sess, num_workers, worker_id, num_replicas_per_worker = \
+        parallax.parallel_run(single_gpu_graph,
+                              FLAGS.resource_info_file,
+                              sync=FLAGS.sync,
+                              parallax_config=config)
 
+
+    fetches = {
+        'global_step': bench.global_step,
+        'cost': bench.cost,
+        'train_op': bench.train_op,
+    }
+
+    start = time.time()
+    for i in range(FLAGS.max_steps):
+        results = sess.run(fetches)
+        if i % FLAGS.log_frequency == 0:
+            end = time.time()
+            throughput = float(FLAGS.log_frequency) / float(end - start)
+            parallax.log.info(
+                "global step: %d, loss: %f, throughput: %f steps/sec"
+                % (results['global_step'][0], results['cost'][0], throughput))
+            start = time.time()
 
 if __name__ == '__main__':
     tf.app.run()

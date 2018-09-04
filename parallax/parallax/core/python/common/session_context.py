@@ -20,17 +20,21 @@ import threading
 import tensorflow as tf
 from tensorflow.python import pywrap_tensorflow as print_mdl
 from tensorflow.python.client import session
-
+from tensorflow.python.util import compat
+   
 def _parallax_init(self, target='', graph=None, config=None):
     """Overwrites the session.__init__."""
     self._init_internal(target, graph, config)  # pylint: disable=protected-access
-
 
 def _parallax_run(self,
                   fetches,
                   feed_dict=None,
                   options=None,
                   run_metadata=None):
+    
+    fetches = self.parallax_session_context._convert_fetch(fetches)
+    feed_dict = self.parallax_session_context._convert_feed(feed_dict)
+
     if (self.parallax_session_context._profile_dir is None 
         or self.parallax_session_context._profile_steps is None):
         return self._run_internal(fetches, feed_dict)
@@ -62,21 +66,35 @@ class ParallaxSessionContext(object):
     """A context that wraps session for Parallax.
        
     This class references tf.contrib.tfprof.ProfileContext class.
-
-    Args:
-        profile_dir: Directory to store profiles.
-        profile_steps: A list of steps for tracing and saving as a file.
     """
    
     def __init__(self,
                  step,
                  profile_dir,
-                 profile_steps):
+                 profile_steps,
+                 replica_dict,
+                 num_replicas_per_worker):
+        """Constructs an `ParallaxSessionContext` instance.
+
+        Args:
+          profile_dir: Directory to store profiles.
+          profile_steps: A list of steps for tracing and saving as a file.
+          replica_dict : A dictionary to map old tensor(operation) name
+            to new tensor(operation) names.
+          num_replicas_per_worker : Number of replicas per worker.
+        """
 
         self._step = step
         self._profile_dir = profile_dir
         self._profile_steps = profile_steps
-        
+        self._replica_dict = replica_dict
+        self._num_replicas_per_worker = num_replicas_per_worker
+
+        for key, values in self._replica_dict.items():
+            if len(values) == 1:
+                item = values[0]
+                self._replica_dict[key] = [item for _ in
+                    range(self._num_replicas_per_worker)]
         self._lock = threading.Lock()
     
     @contextlib.contextmanager
@@ -98,7 +116,73 @@ class ParallaxSessionContext(object):
       with tf.gfile.Open(os.path.join(self._profile_dir, basename), 'wb') as f:
           f.write(metadata.SerializeToString())
 
-    def __enter__(self):
+    def _read_converted_names(self, target):
+        if isinstance(target, compat.bytes_or_text_types):
+            target_name = target
+        else:
+            target_name = target.name
+        if target_name in self._replica_dict:
+            return self._replica_dict[target_name]
+        else:
+            return target
+     
+    def _convert_fetch(self, fetch):
+        if fetch is None:
+            raise TypeError('Fetch argument %r has invalid type %r' % (fetch,
+                                                                 type(fetch)))
+        elif isinstance(fetch, (list, tuple)):
+            return [self._convert_fetch(f) for f in fetch]
+        elif isinstance(fetch, dict):
+            keys = list(fetch.keys())
+            values = [self._convert_fetch(f) for f in fetch.values()]
+            return dict(zip(keys, values))
+        else:
+            if isinstance(fetch, tf.SparseTensor):
+                return [tf.SparseTensor(self._replica_dict[fetch.indices][i],
+                                        self._replica_dict[fetch.values][i],
+                                        self._replica_dict[fetch.dense_shape][i]) 
+                           for i in range(self._num_replicas_per_worker)]
+            elif isinstance(fetch, tf.IndexedSlices):
+                return [tf.IndexedSlices(
+                           self._replica_dict[fetch.values][i],
+                           self._replica_dict[fetch.indices][i],
+                           None if fetch.dense_shape is None \
+                                else self._replica_dict[fetch.dense_shape][i]) 
+                               for i in range(self._num_replicas_per_worker)]
+            else:
+                return self._read_converted_names(fetch)
+
+    def _convert_feed(self, feed_dict):
+
+        def _feed_fn(feed):
+            for tensor_type, _, _, feed_fn in session._REGISTERED_EXPANSIONS:
+                if isinstance(feed, tensor_type):
+                    return feed_fn(feed)
+            raise TypeError('Feed argument %r has invalid type %r' % (feed,
+                                                                   type(feed)))
+        if feed_dict:
+            new_feed_dict = {}
+            for feed, feed_val in feed_dict.items():
+                if isinstance(feed, compat.bytes_or_text_types):
+                    new_feeds = self._read_converted_names(feed)
+                    if isinstance(new_feeds, list):
+                        for i in range(self._num_replicas_per_worker):
+                            new_feed_dict[new_feeds[i]] = feed_val[i]
+                    else:
+                        new_feed_dict[new_feeds] = feed_val
+                else:
+                    for subfeed in _feed_fn(feed):
+                        new_subfeeds = self._read_converted_names(subfeed)
+                        if isinstance(new_subfeeds, list):
+                            for i in range(self._num_replicas_per_worker):
+                                new_feed_dict[new_subfeeds[i]] = feed_val[i]
+                        else:
+                            new_feed_dict[new_subfeeds] = feed_val
+            return new_feed_dict
+        else:
+            return feed_dict
+   
+    def set_parallax_session_context(self):
       self.old_run = getattr(session.BaseSession, 'run', None)
       self.old_init = getattr(session.BaseSession, '__init__', None)
       if not self.old_run:
@@ -119,12 +203,3 @@ class ParallaxSessionContext(object):
         setattr(session.BaseSession, '_init_internal', self.old_init)
         setattr(session.BaseSession, 'parallax_session_context', self)
         return self
-     
-    
-    def __exit__(self, exec_type, exec_value, exec_tb):
-        print_mdl.DeleteProfiler()
-        setattr(session.BaseSession, 'run', self.old_run)
-        setattr(session.BaseSession, '__init__', self.old_init)
-        setattr(session.BaseSession, '_run_internal', None)
-        setattr(session.BaseSession, '_init_internal', None)
-        setattr(session.BaseSession, 'parallax_session_context', None)    
