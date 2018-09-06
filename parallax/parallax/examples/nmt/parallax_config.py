@@ -55,7 +55,6 @@ def calculate_ckpt_steps():
 
 
 def build_config():
-
     ckpt_config = parallax.CheckPointConfig(ckpt_dir=FLAGS.ckpt_dir,
                                             save_ckpt_steps=calculate_ckpt_steps())
     ps_config = parallax.PSConfig(replicate_variables=FLAGS.replicate_variables,

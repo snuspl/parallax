@@ -18,6 +18,7 @@ import sys
 import os
 import json
 import time
+import numpy as np
 
 from absl import flags
 import tensorflow as tf
@@ -48,6 +49,7 @@ tf.app.flags.DEFINE_integer('log_frequency', 100,
 tf.app.flags.DEFINE_boolean('sync', True, '')
 
 def main(_):
+
     # Build benchmark_cnn model
     params = benchmark_cnn.make_params_from_flags()
     params, sess_config = benchmark_cnn.setup(params)
@@ -62,27 +64,29 @@ def main(_):
     single_gpu_graph = tf.Graph()
     with single_gpu_graph.as_default():
         bench.build_model()
+        summary = tf.summary.scalar('train_loss', bench.cost)
+        train_writer = tf.summary.FileWriter('/home/soojeong/resnet50_tensorboard')
 
     config = parallax_config.build_config()
     config.sess_config = sess_config
-
     sess, num_workers, worker_id, num_replicas_per_worker = \
         parallax.parallel_run(single_gpu_graph,
                               FLAGS.resource_info_file,
                               sync=FLAGS.sync,
                               parallax_config=config)
 
-
     fetches = {
         'global_step': bench.global_step,
         'cost': bench.cost,
         'train_op': bench.train_op,
+        'summary': summary
     }
 
     start = time.time()
     for i in range(FLAGS.max_steps):
         results = sess.run(fetches)
         if i % FLAGS.log_frequency == 0:
+            train_writer.add_summary(results['summary'][0], i)
             end = time.time()
             throughput = float(FLAGS.log_frequency) / float(end - start)
             parallax.log.info(
