@@ -36,13 +36,13 @@ def run_partitions_test(data_dir, apps, machine_nums, partitions, elsa_set):
         cmd += ' '.join(testset['args'])
         cmd += ' --mpirun_options=\'-mca btl ^openib -mca btl_tcp_if_include enp129s0f0 -mca pml ob1\''
         cmd += ' --run_option=HYBRID'
-        cmd += ' --profile_steps=450 --profile_dir=%s' % os.path.join(partition_dir, 'profile')
-        cmd += ' --max_steps=500'
+        cmd += ' --profile_steps=410 --profile_dir=%s' % os.path.join(partition_dir, 'profile')
+        cmd += ' --max_steps=420'
         cmd += ' --resource_info_file=%s' % resource_file_path
         if app == 'lm1b':
           cmd += ' --num_variable_shards=%d' % partition
         elif app == 'nmt':
-          cmd += '--num_embeddings_partitions=%d' % partition  
+          cmd += ' --num_embeddings_partitions=%d' % partition  
         cmd += ' >> %s/train_log' % partition_dir
         print('=' * 60)
         print('Start the following COMMAND')
@@ -53,7 +53,7 @@ def run_partitions_test(data_dir, apps, machine_nums, partitions, elsa_set):
         time.sleep(20)   
 
 if __name__ == '__main__':
-  apps = ['lm1b']
+  apps = ['nmt', 'lm1b']
   data_dir = '/home/soojeong/partitions_exp'
 #  machine_nums = [1, 2, 4, 8]
   machine_nums = [1] #[2, 4, 8]
