@@ -1,0 +1,199 @@
+{"resnet50": {
+    "tf_driver": "tf_cnn_benchmarks/CNNBenchmark_tf_distributed_driver.py",
+    "horovod_driver": "tf_cnn_benchmarks/CNNBenchmark_hvd_distributed_driver.py",
+    "parallax_driver": "tf_cnn_benchmarks/CNNBenchmark_distributed_driver.py",
+    "args": [
+      "--model=resnet50",
+      "--data_name=imagenet",
+      "--data_dir=/cmsdata/ssd1/cmslab/imagenet-data",
+      "--batch_size=64",
+      "--weight_decay=0.0001",
+      "--num_total_devices=48",
+      "--optimizer=momentum",
+      "--max_steps=410",
+      "--use_tf_layers=False",
+      "--log_frequency=50",
+      "--boundary_among_servers=True",
+      "--boundary_between_workers_and_servers=True",
+      "--local_aggregation=True"
+    ]
+  },
+  "resnet50_ckpt": {
+    "tf_driver": "tf_cnn_benchmarks/CNNBenchmark_tf_distributed_driver.py",
+    "horovod_driver": "tf_cnn_benchmarks/CNNBenchmark_hvd_distributed_driver.py",
+    "parallax_driver": "tf_cnn_benchmarks/CNNBenchmark_distributed_driver.py",
+    "args": [
+      "--model=resnet50",
+      "--data_name=imagenet",
+      "--data_dir=/cmsdata/ssd1/cmslab/imagenet-data",
+      "--batch_size=64",
+      "--weight_decay=0.0001",
+      "--num_total_devices=48",
+      "--optimizer=momentum",
+      "--max_steps=45875",
+      "--use_tf_layers=False",
+      "--log_frequency=50",
+      "--boundary_among_servers=True",
+      "--boundary_between_workers_and_servers=True",
+      "--local_aggregation=True",
+      "--log_frequency=1251",
+      "--ckpt_dir=/home/pumpkin/ckpt/resnet50_hvd",
+      "--save_ckpt_steps=1251"
+    ]
+  },
+  "inception3": {
+    "tf_driver": "tf_cnn_benchmarks/CNNBenchmark_tf_distributed_driver.py",
+    "horovod_driver": "tf_cnn_benchmarks/CNNBenchmark_hvd_distributed_driver.py",
+    "parallax_driver": "tf_cnn_benchmarks/CNNBenchmark_distributed_driver.py",
+    "args": [
+      "--model=inception3",
+      "--data_name=imagenet",
+      "--data_dir=/cmsdata/ssd1/cmslab/imagenet-data",
+      "--batch_size=64",
+      "--optimizer=rmsprop",
+      "--num_total_devices=48",
+      "--max_steps=410",
+      "--log_frequency=50",
+      "--boundary_among_servers=True",
+      "--boundary_between_workers_and_servers=True",
+      "--local_aggregation=True"
+    ]
+  },
+  "nmt": {
+    "tf_driver": "nmt/nmt_tf_distributed_driver.py",
+    "horovod_driver": "nmt/nmt_hvd_distributed_driver.py",
+    "parallax_driver": "nmt/nmt_distributed_driver.py",
+    "args": [
+      "--src=de",
+      "--tgt=en",
+      "--hparams_path=/home/soojeong/parallax_internal2/parallax/parallax/examples/parallax_examples/nmt/standard_hparams/wmt16_gnmt_4_layer.json",
+      "--out_dir=/tmp/nmt_out_soojeong",
+      "--vocab_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/vocab.bpe.32000",
+      "--train_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/train.tok.clean.bpe.32000",
+      "--dev_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/newstest2013.tok.bpe.32000",
+      "--test_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/newstest2015.tok.bpe.32000",
+      "--num_embeddings_partitions=8",
+      "--batch_size=128",
+      "--epoch_size=4500966",
+      "--max_steps=410",
+      "--log_frequency=50",
+      "--steps_per_stats=50",
+      "--random_seed=100",
+      "--boundary_among_servers=True",
+      "--boundary_between_workers_and_servers=True",
+      "--local_aggregation=True"
+    ]
+  },
+  "lm1b": {
+    "tf_driver": "lm1b/lm1b_tf_distributed_driver.py",
+    "horovod_driver": "lm1b/lm1b_hvd_distributed_driver.py",
+    "parallax_driver": "/home/soojeong/parallax/parallax/parallax/examples/lm1b/lm1b_distributed_driver.py",
+    "args": [
+      "--datadir=/cmsdata/ssd1/cmslab/lm1b",
+      "--learning_rate=0.4",
+      "--batch_size=128",
+      "--log_frequency=100"
+    ]
+  },
+  "lm1b_ckpt": {
+    "tf_driver": "lm1b/lm1b_tf_distributed_driver.py",
+    "horovod_driver": "lm1b/lm1b_hvd_distributed_driver.py",
+    "parallax_driver": "lm1b/lm1b_distributed_driver.py",
+    "args": [
+      "--data_dir=/cmsdata/ssd1/cmslab/lm1b",
+      "--learning_rate=0.4",
+      "--batch_size=128",
+      "--max_steps=43345",
+      "--log_frequency=100",
+      "--num_variable_shards=32",
+      "--boundary_among_servers=True",
+      "--boundary_between_workers_and_servers=True",
+      "--model_dir=/home/pumpkin/ckpt/lm1b_horovod",
+      "--save_ckpt_steps=866",
+      "--load_ckpt_dir=/home/pumpkin/ckpt/lm1b_horovod",
+      "--local_aggregation=True"
+    ]
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  "resnet50_opt": {
+    "tf_driver": "tf_cnn_benchmarks/CNNBenchmark_tf_distributed_driver.py",
+    "horovod_driver": "tf_cnn_benchmarks/CNNBenchmark_hvd_distributed_driver.py",
+    "parallax_driver": "tf_cnn_benchmarks/CNNBenchmark_distributed_driver.py",
+    "args": [
+      "--model=resnet50",
+      "--data_name=imagenet",
+      "--data_dir=/cmsdata/ssd1/cmslab/imagenet-data",
+      "--batch_size=64",
+      "--weight_decay=0.0001",
+      "--num_total_devices=48",
+      "--optimizer=momentum",
+      "--max_steps=410",
+      "--use_tf_layers=False",
+      "--log_frequency=50"
+    ]
+  },
+  "inception3_opt": {
+    "tf_driver": "tf_cnn_benchmarks/CNNBenchmark_tf_distributed_driver.py",
+    "horovod_driver": "tf_cnn_benchmarks/CNNBenchmark_hvd_distributed_driver.py",
+    "parallax_driver": "tf_cnn_benchmarks/CNNBenchmark_distributed_driver.py",
+    "args": [
+      "--model=inception3",
+      "--data_name=imagenet",
+      "--data_dir=/cmsdata/ssd1/cmslab/imagenet-data",
+      "--batch_size=64",
+      "--optimizer=rmsprop",
+      "--num_total_devices=48",
+      "--max_steps=410",
+      "--log_frequency=50"
+    ]
+  },
+  "lm1b_opt": {
+    "tf_driver": "lm1b/lm1b_tf_distributed_driver.py",
+    "horovod_driver": "lm1b/lm1b_hvd_distributed_driver.py",
+    "parallax_driver": "lm1b/lm1b_distributed_driver.py",
+    "args": [
+      "--data_dir=/cmsdata/ssd1/cmslab/lm1b",
+      "--learning_rate=0.4",
+      "--batch_size=128",
+      "--max_steps=410",
+      "--log_frequency=50",
+      "--num_variable_shards=32"
+    ]
+  },
+  "nmt_opt": {
+    "tf_driver": "nmt/nmt_tf_distributed_driver.py",
+    "horovod_driver": "nmt/nmt_hvd_distributed_driver.py",
+    "parallax_driver": "nmt/nmt_distributed_driver.py",
+    "args": [
+      "--src=de",
+      "--tgt=en",
+      "--hparams_path=/home/soojeong/parallax_internal2/parallax/parallax/examples/parallax_examples/nmt/standard_hparams/wmt16_gnmt_4_layer.json",
+      "--out_dir=/tmp/nmt_out_soojeong",
+      "--vocab_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/vocab.bpe.32000",
+      "--train_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/train.tok.clean.bpe.32000",
+      "--dev_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/newstest2013.tok.bpe.32000",
+      "--test_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/newstest2015.tok.bpe.32000",
+      "--num_embeddings_partitions=8",
+      "--batch_size=128",
+      "--epoch_size=4500966",
+      "--max_steps=410",
+      "--log_frequency=50",
+      "--steps_per_stats=50",
+      "--random_seed=100"
+    ]
+  }
+}
