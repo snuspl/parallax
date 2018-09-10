@@ -10,7 +10,7 @@ def parse_thp(data_dir, parsed_data_dir):
 
   apps = os.listdir(data_dir)
   for app in apps:
-    if app == 'parsed_thp':
+    if app == 'parsed_thp' or app == 'parsed_comm':
       continue
 
     if not os.path.exists(os.path.join(parsed_data_dir, app)):
@@ -19,7 +19,7 @@ def parse_thp(data_dir, parsed_data_dir):
     write_file = open(os.path.join(parsed_data_dir, app, 'parsed_thp'), 'w+')
 
     app_dir = os.path.join(data_dir, app)
-    machines = os.listdir(app_dir) 
+    machines = os.listdir(app_dir)
     machines.sort()
     for machine_ in machines:
       machine_dir = os.path.join(app_dir, machine_)
@@ -31,6 +31,8 @@ def parse_thp(data_dir, parsed_data_dir):
         partition_dir = os.path.join(machine_dir, partition_)
         if not partition_.startswith('P') or not os.path.isdir(partition_dir):
           continue
+        if not os.path.exists(os.path.join(partition_dir, 'train_log')):
+          continue
         with open(os.path.join(partition_dir, 'train_log'), 'r') as f:
           wps_list = []
           for line in f: 
@@ -39,8 +41,16 @@ def parse_thp(data_dir, parsed_data_dir):
               match = re.match('(.*)Iteration (.*), (.*), wps = (.*), (.*)', line)
               if match:
                 _, step, _, wps, _ = match.groups()
-                if int(step) >= 350 and int(step) <= 410:
+                if int(step) >= 300 and int(step) <= 410:
                   wps_list.append(int(wps))
+            elif app == 'nmt':
+              #step 100 lr 1 step-time 4.19s wps 1.71K ppl 14313.75 gN 65.55 bleu 0.00, Mon Sep 10 14:16:17 2018 
+              match = re.match('(.*)step ([0-9]+) lr(.*) wps (.*) ppl(.*)', line)
+              if match:
+                _, step, _, wps, _ = match.groups()
+                if int(step) >= 300 and int(step) <= 410:
+                  wps_num = float(wps.split('K')[0]) * 1000
+                  wps_list.append(wps_num)
           if wps_list:
             total_wps = np.mean(wps_list) * num_replicas
             write_file.write('%s: wps = %d\n' % (partition_, total_wps))
