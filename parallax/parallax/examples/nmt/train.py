@@ -40,11 +40,11 @@ __all__ = [
 
 
 def run_sample_decode(infer_model, infer_sess, model_dir, hparams,
-                      summary_writer, src_data, tgt_data):
+                      summary_writer, src_data, tgt_data, ckpt_index=None):
   """Sample decode a random sentence from src_data."""
   with infer_model.graph.as_default():
     loaded_infer_model, global_step = model_helper.create_or_load_model(
-        infer_model.model, model_dir, infer_sess, "infer")
+        infer_model.model, model_dir, infer_sess, "infer", ckpt_index)
 
   _sample_decode(loaded_infer_model, global_step, infer_sess, hparams,
                  infer_model.iterator, src_data, tgt_data,
@@ -54,11 +54,11 @@ def run_sample_decode(infer_model, infer_sess, model_dir, hparams,
 
 def run_internal_eval(
     eval_model, eval_sess, model_dir, hparams, summary_writer,
-    use_test_set=True):
+    use_test_set=True, ckpt_index=None):
   """Compute internal evaluation (perplexity) for both dev / test."""
   with eval_model.graph.as_default():
     loaded_eval_model, global_step = model_helper.create_or_load_model(
-        eval_model.model, model_dir, eval_sess, "eval")
+        eval_model.model, model_dir, eval_sess, "eval", ckpt_index)
 
   dev_src_file = "%s.%s" % (hparams.dev_prefix, hparams.src)
   dev_tgt_file = "%s.%s" % (hparams.dev_prefix, hparams.tgt)
@@ -86,11 +86,11 @@ def run_internal_eval(
 
 def run_external_eval(infer_model, infer_sess, model_dir, hparams,
                       summary_writer, save_best_dev=True, use_test_set=True,
-                      avg_ckpts=False):
+                      avg_ckpts=False, ckpt_index=None):
   """Compute external evaluation (bleu, rouge, etc.) for both dev / test."""
   with infer_model.graph.as_default():
     loaded_infer_model, global_step = model_helper.create_or_load_model(
-        infer_model.model, model_dir, infer_sess, "infer")
+        infer_model.model, model_dir, infer_sess, "infer", ckpt_index)
 
   dev_src_file = "%s.%s" % (hparams.dev_prefix, hparams.src)
   dev_tgt_file = "%s.%s" % (hparams.dev_prefix, hparams.tgt)
@@ -158,14 +158,14 @@ def run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
 
 def run_full_eval(model_dir, infer_model, infer_sess, eval_model, eval_sess,
                   hparams, summary_writer, sample_src_data, sample_tgt_data,
-                  avg_ckpts=False):
+                  avg_ckpts=False, ckpt_index=None):
   """Wrapper for running sample_decode, internal_eval and external_eval."""
   run_sample_decode(infer_model, infer_sess, model_dir, hparams, summary_writer,
-                    sample_src_data, sample_tgt_data)
+                    sample_src_data, sample_tgt_data, ckpt_index=ckpt_index)
   dev_ppl, test_ppl = run_internal_eval(
-      eval_model, eval_sess, model_dir, hparams, summary_writer)
+      eval_model, eval_sess, model_dir, hparams, summary_writer, ckpt_index=ckpt_index)
   dev_scores, test_scores, global_step = run_external_eval(
-      infer_model, infer_sess, model_dir, hparams, summary_writer)
+      infer_model, infer_sess, model_dir, hparams, summary_writer, ckpt_index=ckpt_index)
 
   metrics = {
       "dev_ppl": dev_ppl,
@@ -176,6 +176,7 @@ def run_full_eval(model_dir, infer_model, infer_sess, eval_model, eval_sess,
 
   avg_dev_scores, avg_test_scores = None, None
   if avg_ckpts:
+    assert ckpt_index is None
     avg_dev_scores, avg_test_scores = run_avg_external_eval(
         infer_model, infer_sess, model_dir, hparams, summary_writer,
         global_step)
@@ -495,7 +496,8 @@ def _internal_eval(model, global_step, sess, iterator, iterator_feed_dict,
   """Computing perplexity."""
   sess.run(iterator.initializer, feed_dict=iterator_feed_dict)
   ppl = model_helper.compute_perplexity(model, sess, label)
-  utils.add_summary(summary_writer, global_step, "%s_ppl" % label, ppl)
+  if summary_writer:
+    utils.add_summary(summary_writer, global_step, "%s_ppl" % label, ppl)
   return ppl
 
 
@@ -567,8 +569,9 @@ def _external_eval(model, global_step, sess, hparams, iterator,
       else:
         best_metric_label = "best_" + metric
 
-      utils.add_summary(summary_writer, global_step, "%s_%s" % (label, metric),
-                        scores[metric])
+      if summary_writer:
+        utils.add_summary(summary_writer, global_step, "%s_%s" % (label, metric),
+                          scores[metric])
       # metric: larger is better
       if save_on_best and scores[metric] > getattr(hparams, best_metric_label):
         setattr(hparams, best_metric_label, scores[metric])
