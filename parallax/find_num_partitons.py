@@ -6,6 +6,7 @@ def parse_comm(comm_file_path):
   total_data = {}
   data = []
   tensor_comm_log = {}
+  comp_times = {}
   with open(comm_file_path, 'r') as f:
     num_partitions = None
     for line in f:
@@ -15,9 +16,15 @@ def parse_comm(comm_file_path):
             if key not in total_data:
               total_data[key] = []
             total_data[key].append(value[2] - value[1])
-            data.append((key, num_partitions, value[0], value[2] - value[1]))
+            data.append((key, num_partitions, value[0], value[2] - value[1], value[1], value[2]))
           tensor_comm_log.clear()
         num_partitions = int(line.split('P')[1])
+      elif line.startswith('('):
+        assert num_partitions
+        comp_times[num_partitions] = []
+        for comp_time in line.split('), '):
+          split = comp_time.strip('(').strip(')\n').split(', ')
+          comp_times[num_partitions].append((int(split[0]), int(split[1])))
       elif num_partitions:
         comm_log = line.strip().split(', ')
         if 'embedding_lookup/Gather' in comm_log[0] or 'embedding_lookup_grad/Gather' in comm_log[0]:
@@ -45,13 +52,13 @@ def parse_comm(comm_file_path):
       if key not in total_data:
         total_data[key] = []
       total_data[key].append(value[2] - value[1])
-      data.append((key, num_partitions, value[0], value[2] - value[1])) 
+      data.append((key, num_partitions, value[0], value[2] - value[1], value[1], value[2])) 
     tensor_comm_log.clear()
 
   #for key, value in total_data.items():
     #print(key)
     #print(value)
-  return data   
+  return comp_times, data   
 
 def find_partitons(data):
   partitions = []
@@ -84,11 +91,36 @@ def find_partitons(data):
       optimal_partitions = i
 
   print('optimal partitions: %d, estimated total comm time : %d' % (optimal_partitions, min_comm_time))
+
+def remove_overlap(comp_times, data):
+  new_data = []
+  for d in data:
+    partitions = d[1]
+    comm_time = d[3]
+    start = d[4]
+    end = d[5]
+    print(partitions)
+    for s,e in comp_times[partitions]:
+      if end < s:
+        break  
+      elif start > e:
+        continue
+      else:
+        # overlap
+        overlap_s = max(start, s)
+        overlap_e = min(end, e)
+        #assert overlap_s != start or overlap_e != end
+        comm_time -= overlap_e - overlap_s
+    if comm_time > 0:
+      new_data.append((d[0], d[1], d[2], comm_time, d[4], d[5]))
+  return new_data
+   
 if __name__ == '__main__':
   comm_file_path = '/home/soojeong/partitions_exp/parsed_comm/nmt/M8/parsed_comm'
 
-  # data is a list of (name, #partitons, data_size, comm_time)
-  data = parse_comm(comm_file_path)
+  # data is a list of (name, #partitons, data_size, comm_time, start, end)
+  comp_times, data = parse_comm(comm_file_path)
+  #new_data = remove_overlap(comp_times, data)
   #print(data)
   find_partitons(data)
 

@@ -5,6 +5,48 @@ import tensorflow as tf
 import time
 import numpy as np
 
+def get_computation_times(run_metadata):
+  comp_times = []
+
+  for dev_stat in run_metadata.step_stats.dev_stats:
+    if 'stream' not in dev_stat.device:
+      for node_stat in dev_stat.node_stats:
+        if node_stat.node_name == 'RecvTensor' or \
+          node_stat.node_name.startswith('HorovodAll'):
+          continue
+        start = node_stat.all_start_micros
+        end = node_stat.all_end_rel_micros + start
+        to_merge_index = []
+
+        search_start = -1
+        for i in range(len(comp_times)):
+          s, e = comp_times[i]
+          if end < s or (s <= start and e >= start):
+            break
+          search_start = i
+
+        if search_start < 0:
+          comp_times.insert(0, (start, end))
+          continue
+
+        for i in range(search_start, len(comp_times)):
+          s, e = comp_times[i]
+          if end < s:
+            break
+          elif start <= e:
+            to_merge_index.append(i)
+            start = min(s, start)
+            end = max(e, end)
+          else:
+            search_start += 1
+
+        assert len(to_merge_index) <= len(comp_times)
+        if to_merge_index:
+          for i in range(len(to_merge_index)):
+            del comp_times[to_merge_index[0]]
+        comp_times.insert(search_start, (start, end))
+  return comp_times
+
 def parse_timeline_label(label):
   match = re.match(r'\[(.*)\] edge_([0-9]+)_(.*) from (.*) to (.*)', label)
   data, edge_num, tensor, from_d, to_d = match.groups()
@@ -76,6 +118,9 @@ def parse_comm(data_dir, parsed_data_dir):
         run_metadata = tf.RunMetadata()
         with open(os.path.join(partition_dir, 'profile', 'run_meta_410'), 'rb') as f:
           run_metadata.MergeFromString(f.read())
+        comp_times = get_computation_times(run_metadata)
+        write_file.write(', '.join(['(%d, %d)' % (comp_time[0], comp_time[1]) for comp_time in comp_times]))
+        write_file.write('\n')
 
         comm_logs = parse_runmetadata(run_metadata)
         for comm_log in comm_logs:
