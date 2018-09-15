@@ -627,7 +627,8 @@ def eval_fn(hparams, scope=None, target_session=""):
       model_dir, infer_model, infer_sess,
       eval_model, eval_sess, hparams,
       None, sample_src_data,
-      sample_tgt_data, avg_ckpts, ckpt_index=ckpt_index)
+      sample_tgt_data, avg_ckpts, ckpt_index=ckpt_index,
+      eval_all=False)
 
 def main(unused_argv):
   default_hparams = create_hparams(FLAGS)

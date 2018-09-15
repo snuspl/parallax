@@ -15,6 +15,7 @@
 """For training NMT models."""
 from __future__ import print_function
 
+import numpy as np
 import math
 import os
 import random
@@ -40,7 +41,8 @@ __all__ = [
 
 
 def run_sample_decode(infer_model, infer_sess, model_dir, hparams,
-                      summary_writer, src_data, tgt_data, ckpt_index=None):
+                      summary_writer, src_data, tgt_data, ckpt_index=None,
+                      data_index=None):
   """Sample decode a random sentence from src_data."""
   with infer_model.graph.as_default():
     loaded_infer_model, global_step = model_helper.create_or_load_model(
@@ -49,7 +51,8 @@ def run_sample_decode(infer_model, infer_sess, model_dir, hparams,
   _sample_decode(loaded_infer_model, global_step, infer_sess, hparams,
                  infer_model.iterator, src_data, tgt_data,
                  infer_model.src_placeholder,
-                 infer_model.batch_size_placeholder, summary_writer)
+                 infer_model.batch_size_placeholder, summary_writer,
+                 data_index)
 
 
 def run_internal_eval(
@@ -158,20 +161,53 @@ def run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
 
 def run_full_eval(model_dir, infer_model, infer_sess, eval_model, eval_sess,
                   hparams, summary_writer, sample_src_data, sample_tgt_data,
-                  avg_ckpts=False, ckpt_index=None):
+                  avg_ckpts=False, ckpt_index=None, eval_all=False):
   """Wrapper for running sample_decode, internal_eval and external_eval."""
-  run_sample_decode(infer_model, infer_sess, model_dir, hparams, summary_writer,
-                    sample_src_data, sample_tgt_data, ckpt_index=ckpt_index)
-  dev_ppl, test_ppl = run_internal_eval(
-      eval_model, eval_sess, model_dir, hparams, summary_writer, ckpt_index=ckpt_index)
-  dev_scores, test_scores, global_step = run_external_eval(
-      infer_model, infer_sess, model_dir, hparams, summary_writer, ckpt_index=ckpt_index)
+  dev_ppls = []
+  test_ppls = []
+  dev_scores_dict = {}
+  test_scores_dict = {}
+  for i in range(len(sample_src_data)):
 
+    data_index = i
+    if not eval_all:
+      data_index = None
+
+    run_sample_decode(infer_model, infer_sess, model_dir, hparams, summary_writer,
+                    sample_src_data, sample_tgt_data, ckpt_index=ckpt_index, data_index=data_index)
+    dev_ppl, test_ppl = run_internal_eval(
+      eval_model, eval_sess, model_dir, hparams, summary_writer, ckpt_index=ckpt_index)
+    dev_scores, test_scores, global_step = run_external_eval(
+      infer_model, infer_sess, model_dir, hparams, summary_writer, ckpt_index=ckpt_index)
+    dev_ppls.append(dev_ppl)
+    if test_ppl is not None:
+      test_ppls.append(dev_ppl)
+    for key in dev_scores:
+      if key not in dev_scores_dict:
+        dev_scores_dict[key] = []
+      dev_scores_dict[key].append(dev_scores[key])
+    if test_scores is not None:
+      for key in test_scores:
+        if key not in test_scores_dict:
+          test_scores_dict[key] = []
+        test_scores_dict[key].append(test_scores[key])
+    
+    if not eval_all:
+      break
+
+  for key in dev_scores_dict:
+    v = np.mean(dev_scores_dict[key])
+    dev_scores_dict[key] = v
+
+  for key in test_scores_dict:
+    v = np.mean(test_scores_dict[key])
+    test_scores_dict[key] = v
+    
   metrics = {
-      "dev_ppl": dev_ppl,
-      "test_ppl": test_ppl,
-      "dev_scores": dev_scores,
-      "test_scores": test_scores,
+      "dev_ppl": np.mean(dev_ppls),
+      "test_ppl": np.mean(test_ppl),
+      "dev_scores": dev_scores_dict,
+      "test_scores": test_scores_dict,
   }
 
   avg_dev_scores, avg_test_scores = None, None
@@ -503,9 +539,13 @@ def _internal_eval(model, global_step, sess, iterator, iterator_feed_dict,
 
 def _sample_decode(model, global_step, sess, hparams, iterator, src_data,
                    tgt_data, iterator_src_placeholder,
-                   iterator_batch_size_placeholder, summary_writer):
+                   iterator_batch_size_placeholder, summary_writer,
+                   data_index):
   """Pick a sentence and decode."""
-  decode_id = random.randint(0, len(src_data) - 1)
+  if data_index is None:
+    decode_id = random.randint(0, len(src_data) - 1)
+  else:
+    decode_id = data_index
   utils.print_out("  # %d" % decode_id)
 
   iterator_feed_dict = {
