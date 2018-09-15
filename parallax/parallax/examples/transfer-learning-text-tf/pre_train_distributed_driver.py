@@ -1,7 +1,9 @@
 import tensorflow as tf
 import argparse
 import os
+import numpy as np
 import pickle
+
 from model.auto_encoder import AutoEncoder
 from model.language_model import LanguageModel
 from data_utils import build_word_dict, build_word_dataset, batch_iter, download_dbpedia
@@ -62,11 +64,9 @@ def train():
     train_x, train_y = build_word_dataset("train", word_dict, MAX_DOCUMENT_LEN, data_dir=FLAGS.data_dir)
 
     # Training loop
-    batch_x = []
-    for i in range(num_replicas_per_worker):
-        batches, _ = next(batch_iter(train_x, train_y, FLAGS.batch_size, NUM_EPOCHS, num_workers, worker_id))
-        batch_x.append(batches)
-    train_step(batch_x)
+    batches, _ = next(batch_iter(train_x, train_y, FLAGS.batch_size * num_replicas_per_worker, NUM_EPOCHS, num_workers, worker_id))
+    print("getting batches")
+    train_step(np.split(batches, num_replicas_per_worker))
 
 if __name__ == "__main__":
     train()
