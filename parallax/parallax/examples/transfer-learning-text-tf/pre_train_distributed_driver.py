@@ -1,6 +1,6 @@
 import tensorflow as tf
 import argparse
-import os
+import os, sys
 import numpy as np
 import pickle
 
@@ -39,7 +39,6 @@ def train():
             model = LanguageModel(word_dict, MAX_DOCUMENT_LEN)
         else:
             raise ValueError("Invalid model: {0}. Use auto_encoder | language_model".format(FLAGS.model))
-
         # Define training procedure
         global_step = tf.train.get_or_create_global_step()
         params = tf.trainable_variables()
@@ -47,6 +46,9 @@ def train():
         clipped_gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
         optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
         train_op = optimizer.apply_gradients(zip(clipped_gradients, params), global_step=global_step)
+        print(model.loss)
+        print(model.x)
+        print(train_op)
 
     sess, num_workers, worker_id, num_replicas_per_worker = \
         parallax.parallel_run(single_gpu_graph,
@@ -54,8 +56,10 @@ def train():
                               parallax_config=parallax_config.build_config())
 
     def train_step(batch_x):
-        feed_dict = {model.x: batch_x}
-        _, step, loss = sess.run([train_op, global_step, model.loss], feed_dict=feed_dict)
+        print('run train op')
+        _, step, loss = sess.run([train_op, global_step, model.loss], feed_dict={model.x:batch_x})
+        print('after run')
+        sys.stdout.flush()
 
         if step[0] % 100 == 0:
             print("step {0} : loss = {1}".format(step[0], loss[0]))
@@ -64,9 +68,9 @@ def train():
     train_x, train_y = build_word_dataset("train", word_dict, MAX_DOCUMENT_LEN, data_dir=FLAGS.data_dir)
 
     # Training loop
-    batches, _ = next(batch_iter(train_x, train_y, FLAGS.batch_size * num_replicas_per_worker, NUM_EPOCHS, num_workers, worker_id))
-    print("getting batches")
-    train_step(np.split(batches, num_replicas_per_worker))
+    for i in range(FLAGS.max_steps):
+        batches, _ = next(batch_iter(train_x, train_y, FLAGS.batch_size * num_replicas_per_worker, NUM_EPOCHS, num_workers, worker_id))
+        train_step(np.split(batches, num_replicas_per_worker))
 
 if __name__ == "__main__":
     train()

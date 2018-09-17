@@ -100,8 +100,11 @@ def parse_comm(data_dir, parsed_data_dir):
       parsed_machine_dir = os.path.join(parsed_app_dir, machine_)
       if not os.path.exists(parsed_machine_dir):
         os.makedirs(parsed_machine_dir)
-      write_file = open(os.path.join(parsed_machine_dir, 'parsed_comm'), 'w+')
 
+      if os.path.exists(os.path.join(parsed_machine_dir, 'parsed_comm')):
+        continue
+
+      write_file = open(os.path.join(parsed_machine_dir, 'parsed_comm'), 'w+')
       num_replicas = int(machine_.split('M')[1]) * 6
       write_file.write('Tensor, DataSize(bytes), CommStart(usecs), CommTime(usecs), CommType\n')
       partitions = os.listdir(machine_dir)

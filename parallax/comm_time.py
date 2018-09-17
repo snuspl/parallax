@@ -16,7 +16,7 @@ def parse_comm(comm_file_path):
             if key not in total_data:
               total_data[key] = []
             total_data[key].append(value[2] - value[1])
-            data.append((key, num_partitions, value[0], value[2] - value[1], value[1], value[2]))
+            data.append((key, num_partitions, value[0], value[2] - value[1], value[1], value[2], value[3]))
           tensor_comm_log.clear()
         num_partitions = int(line.split('P')[1])
       elif line.startswith('('):
@@ -26,37 +26,30 @@ def parse_comm(comm_file_path):
           split = comp_time.strip('(').strip(')\n').split(', ')
           comp_times[num_partitions].append((int(split[0]), int(split[1])))
       elif num_partitions:
-        comm_log = line.strip().split(', ')
-        #if 'embedding_lookup/Gather' in comm_log[0] or 'embedding_lookup_grad/Gather' in comm_log[0]:
-        #  if 'Take-Grad' in comm_log[0]:
-        #    continue
-        
-        if 'HorovodAllreduce' in comm_log[0]:
-          continue
-        else:
-          #match = re.match('(.*)_([0-9]+)', comm_log[0])
-          #if match: 
-          #  tensor_name = match.groups()[0]
-          #else:
-          tensor_name = comm_log[0]
+          comm_log = line.strip().split(', ')
+          match = re.match('(.*)_([0-9]+)', comm_log[0])
+          if match: 
+            tensor_name = match.groups()[0]
+          else:
+            tensor_name = comm_log[0]
           bytes = int(comm_log[1])
           start_time = int(comm_log[2])
           duration = int(comm_log[3])
           if tensor_name not in tensor_comm_log:
-            tensor_comm_log[tensor_name] = (bytes, start_time, start_time + duration)
+            tensor_comm_log[tensor_name] = (bytes, start_time, start_time + duration, comm_log[4])
           else:
             old_start_time = tensor_comm_log[tensor_name][1]
             old_end_time = tensor_comm_log[tensor_name][2]
             new_start_time = min(start_time, old_start_time)
             new_end_time = max(old_end_time, start_time+duration)
             new_bytes = tensor_comm_log[tensor_name][0] + bytes
-            tensor_comm_log[tensor_name] = (new_bytes, new_start_time, new_end_time)
+            tensor_comm_log[tensor_name] = (new_bytes, new_start_time, new_end_time, tensor_comm_log[tensor_name][3])
   if tensor_comm_log:
     for key, value in tensor_comm_log.items():
       if key not in total_data:
         total_data[key] = []
       total_data[key].append(value[2] - value[1])
-      data.append((key, num_partitions, value[0], value[2] - value[1], value[1], value[2])) 
+      data.append((key, num_partitions, value[0], value[2] - value[1], value[1], value[2], value[3])) 
     tensor_comm_log.clear()
 
   #for key, value in total_data.items():
@@ -72,11 +65,10 @@ def find_partitons(data):
     partitions.append(d[1])
     data_size.append(d[2])
     comm_time.append(d[3])
-  fitfunc = lambda p, n, d: p[0] * n + p[1] * 1 / n
+  fitfunc = lambda p, n, d: p[0] * n + p[1] * d / n
   errfunc = lambda p, n, d, y :(fitfunc(p, n, d) - y)
   p0 = np.random.rand(2)
   p, success = optimize.leastsq(errfunc, p0, args=(np.array(partitions), np.array(data_size), np.array(comm_time)))
-  print(p)
   
   min_partitions = np.min(partitions)
   max_partitions = np.max(partitions)
@@ -103,7 +95,7 @@ def remove_overlap(comp_times, data):
     comm_time = d[3]
     start = d[4]
     end = d[5]
-    print(partitions)
+    #print(partitions)
     for s,e in comp_times[partitions]:
       if end < s:
         break  
@@ -116,15 +108,25 @@ def remove_overlap(comp_times, data):
         #assert overlap_s != start or overlap_e != end
         comm_time -= overlap_e - overlap_s
     if comm_time > 0:
-      new_data.append((d[0], d[1], d[2], comm_time, d[4], d[5]))
+      new_data.append((d[0], d[1], d[2], comm_time, d[4], d[5], d[6]))
   return new_data
    
 if __name__ == '__main__':
   comm_file_path = '/home/soojeong/partitions_exp/parsed_comm/nmt/M8/parsed_comm'
 
-  # data is a list of (name, #partitons, data_size, comm_time, start, end)
+  # data is a list of (name, #partitons, data_size, comm_time, start, end, comm_type)
   comp_times, data = parse_comm(comm_file_path)
+  #print(data)
+  ps_time = 0
+  mpi_time = 0
+  for d in data:
+    if d[-1] == 'PS':
+      ps_time += d[3]
+    else:
+      mpi_time += d[3]
+  print(ps_time)
+  print(mpi_time)
   #new_data = remove_overlap(comp_times, data)
-  print(data)
-  find_partitons(data)
+  #print(new_data)
+  #find_partitons(data)
 

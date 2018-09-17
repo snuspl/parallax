@@ -57,7 +57,7 @@ def run_partitions_test(data_dir, apps, machine_nums, partitions, elsa_set):
 if __name__ == '__main__':
   apps = ['lm1b', 'nmt']
   data_dir = '/home/soojeong/partitions_exp'
-  machine_nums = [4, 2, 1, 8]
+  machine_nums = [8, 4, 2, 1]
   partitions = [2, 4, 8, 16, 32, 48, 64, 128]
   partitions.reverse()
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
   # e1,e2,e3,e4 will be used for 4 machine exp.
   # e1,e2,e3,e4,e5,e6,e7,e8 will be used for 8 machine exp.
   #elsa_set = raw_input('Input 8 elsa indices(format: 1,2,3,4,5,6,7,8): ')
-  elsa_set = '3,1,11,6,7,8,10,2'
+  elsa_set = '3,6,7,8,1,2,10,11'
   elsa_set = ['elsa-' + '%02d'%int(elsa_idx) + '-ib0' for elsa_idx in elsa_set.split(',')]
   print(elsa_set)
 
