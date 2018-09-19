@@ -117,14 +117,15 @@ class PartitionStatCollector(object):
 			self.p_to_test = min(self.p_list) / 2
 		else:
 		    # keep increase or keep decrease
-                    if (self.prev_exec_time / curr_exec_time) < 0.1:
-                        # only search when the curr search result is at least
-                        # 10% faster than prev search
-                        stop = True
-		    elif self.prev_p < curr_p:
-			self.p_to_test *= 2
+		    if self.prev_p < curr_p:
+                        if (self.prev_exec_time / curr_exec_time) < 0.1:
+                            self.p_to_test = min(self.p_list) / 2
+                        else:
+			    self.p_to_test *= 2
 		    else:
 			self.p_to_test /= 2
+                        if (self.prev_exec_time / curr_exec_time) < 0.1:
+                            stop = True
 
 		if self.p_to_test < self.min_partitions:
 		    stop = True
