@@ -72,7 +72,7 @@ class PartitionStatCollector(object):
         self.exec_time_list = []
         self.p_list = []
         self.start = None
-        self.min_partitions = p_to_test
+        self.min_partitions = 1
         
     def setup_manager(self):
         if self.start is None:
@@ -119,6 +119,7 @@ class PartitionStatCollector(object):
 		    # keep increase or keep decrease
 		    if self.prev_p < curr_p:
                         if (self.prev_exec_time / curr_exec_time) < 0.1:
+                            # search the opposite partitions
                             self.p_to_test = min(self.p_list) / 2
                         else:
 			    self.p_to_test *= 2
