@@ -15,6 +15,7 @@ from utils import iterator_utils
 from utils import misc_utils as utils
 from utils import vocab_utils
 
+import parallax
 
 __all__ = [
     "get_initializer", "get_device_str", "create_train_model",
@@ -265,6 +266,7 @@ def _create_or_load_embed(embed_name, vocab_file, embed_file,
     with tf.device(_get_embed_device(vocab_size)):
       embedding = tf.get_variable(
           embed_name, [vocab_size, embed_size], dtype)
+      embedding = tf.identity(embedding)
   return embedding
 
 
@@ -304,6 +306,7 @@ def create_emb_for_encoder_and_decoder(share_vocab,
       size.
   """
 
+  num_partitons = parallax.partition.get_partitions(num_partitions)
   if num_partitions <= 1:
     partitioner = None
   else:

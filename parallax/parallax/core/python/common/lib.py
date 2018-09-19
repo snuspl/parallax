@@ -139,13 +139,15 @@ def parse_resource_info(path, run_option):
         for machine_info in file:
             machines.extend(_parse_machine_info(machine_info.strip()))
 
+    master_host = machines[0][0]
+    master = [{'hostname': master_host, 'port': _get_empty_port(master_host, 1), 'gpus': []}]
     ps = [{'hostname': hostname, 'port': _get_empty_port(hostname, 1), 'gpus': []} for hostname, _ in machines]
     worker = [{'hostname': hostname, 
                'port': _get_empty_port(hostname, 1 if run_option != 'HYBRID' \
                    or len(gpus) == 0 else len(gpus)), 'gpus': gpus} \
                        for hostname, gpus in machines]
 
-    resource_info = {'ps': ps, 'worker': worker}
+    resource_info = {'master': master, 'ps': ps, 'worker': worker}
     return resource_info
 
 

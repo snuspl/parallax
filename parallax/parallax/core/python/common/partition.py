@@ -13,14 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 
-from parallax.core.python.common import partition
-from parallax.core.python.common.runner import parallel_run
-from parallax.core.python.common import shard
-from parallax.core.python.common.lib import parallax_log as log
+import os
 
-from parallax.core.python.common.config import ParallaxConfig as Config
-from parallax.core.python.common.config import PSConfig
-from parallax.core.python.common.config import MPIConfig
-from parallax.core.python.common.config import CommunicationConfig
-from parallax.core.python.common.config import CheckPointConfig
-from parallax.core.python.common.config import ProfileConfig
+import tensorflow as tf
+
+PARALLAX_PARTITIONS = "PARALLAX_PARTITIONS"
+PARALLAX_SEARCH = "PARALLAX_SEARCH"
+
+def get_partitions(default_num_shards, axis=0):
+  if PARALLAX_PARTITIONS in os.environ:
+      num_shards = int(os.environ[PARALLAX_PARTITIONS])
+  else:
+      num_shards = max(default_num_shards, 1)
+  return num_shards
+  

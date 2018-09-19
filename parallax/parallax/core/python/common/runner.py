@@ -13,7 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 
+from multiprocessing.managers import BaseManager
 import os
+import Queue
+import numpy as np
+from scipy import optimize
 import sys
 import time
 import traceback
@@ -58,6 +62,128 @@ def _get_grads(single_gpu_meta_graph_def):
     assert len(sparse_grads) > 0 or len(dense_grads) > 0
     return sparse_grads, dense_grads
 
+class PartitionStatCollector(object):
+
+    def __init__(self, p_to_test, address):
+        self.p_to_test = p_to_test
+        self.address = address
+        self.prev_p = None
+        self.prev_exec_time = None
+        self.exec_time_list = []
+        self.p_list = []
+        self.start = None
+        self.min_partitions = p_to_test
+        
+    def setup_manager(self):
+        if self.start is None:
+            self.start = time.time()
+        self.m = BaseManager(address=self.address, authkey='parallax_auth')
+        queue = Queue.Queue()
+        BaseManager.register('queue', callable=lambda:queue)
+        self.m.start()
+        return self.m
+
+    def recv_exec_time(self, processes, cleanup, num_required):
+        stop = False
+        worker_exec_times = []
+        all_alive = True
+        while len(worker_exec_times) != num_required and all_alive:
+            time.sleep(10)
+            q = self.m.queue()
+            while q.qsize() > 0:
+                worker_exec_times.append(q.get())
+ 
+            for p in processes:
+              if p.poll() is not None:
+                  all_alive = False
+                  break
+
+        cleanup(None, None)
+        time.sleep(10)
+
+        if all_alive:
+            curr_p = self.p_to_test
+            curr_exec_time = np.mean(worker_exec_times)
+            self.p_list.append(curr_p)
+            self.exec_time_list.append(curr_exec_time)
+
+            if self.prev_p:
+		if self.prev_exec_time < curr_exec_time:
+		    # decrease or stop
+                    if self.prev_p > curr_p:
+                        stop = True
+		    else:
+	                # search the oposite partitions
+			self.p_to_test = min(self.p_list) / 2
+		else:
+		    # keep increase or keep decrease
+                    if (self.prev_exec_time / curr_exec_time) < 0.1:
+                        # only search when the curr search result is at least
+                        # 10% faster than prev search
+                        stop = True
+		    elif self.prev_p < curr_p:
+			self.p_to_test *= 2
+		    else:
+			self.p_to_test /= 2
+
+		if self.p_to_test < self.min_partitions:
+		    stop = True
+	    else:
+		# increase first
+		self.p_to_test *= 2
+
+	    self.prev_p = curr_p
+	    self.prev_exec_time = curr_exec_time
+        else:
+            # communication error when num partitions is small
+            if self.prev_p:
+                stop = True
+            else:
+                self.p_to_test *= 2
+                self.min_partitions = self.p_to_test
+
+        if stop:
+            end = time.time()
+            self.p_to_test = self._find_optimal_p()
+            parallax_log.info('optimal partitions: %d, search time: %d secs' % \
+                (self.p_to_test, end - self.start))
+            print('optimal partitions: %d, search time: %d secs' % \
+                (self.p_to_test, end - self.start))
+
+        return not stop, self.p_to_test
+
+    def _find_optimal_p(self):
+        parallax_log.info('start finding optimal p')
+        print('start finding optimal p')
+        parallax_log.info(self.p_list)
+        print(self.p_list)
+        parallax_log.info(self.exec_time_list)
+        print(self.exec_time_list)
+        
+        if len(self.p_list) < 3:
+          min_exec_time = min(self.exec_time_list)
+          return self.p_list[self.exec_time_list.index(min_exec_time)]
+            
+        max_time = float(max(self.exec_time_list))
+        exec_times = [t / max_time for t in self.exec_time_list]
+
+        fitfunc = lambda n, a, b, c: b / n + a * (n - 1) + c
+        p, pcov = optimize.curve_fit(fitfunc, np.array(self.p_list), np.array(exec_times))
+
+        min_p = min(self.p_list)
+        max_p = max(self.p_list)
+
+        min_exec_time = None
+        optimal_p = None
+        for i in range(min_p, max_p + 1):
+          prediction = fitfunc(i, p[0], p[1], p[2])
+
+          if min_exec_time is None or min_exec_time > prediction:
+            min_exec_time = prediction
+            optimal_p = i
+
+        return optimal_p
+
 def _parallax_run_master(single_gpu_meta_graph_def,
                          config):
 
@@ -68,29 +194,58 @@ def _parallax_run_master(single_gpu_meta_graph_def,
     args = sys.argv[1:]
 
     sparse_grads, dense_grads = _get_grads(single_gpu_meta_graph_def)
+
+    search_p = False
+    p_to_test = None
+    if config.search_partitions:
+      # Set to find automatic embedding partitoning
+      p_to_test = len(config.resource_info['worker'])
+      address = (config.resource_info['master'][0]['hostname'],
+                 int(config.resource_info['master'][0]['port'][0]))
+      
+      stat_collector = PartitionStatCollector(p_to_test, address)
+      search_p = True
+
     cleanup = None
     try:
-        if config.run_option == 'MPI' or \
-            (config.run_option == 'HYBRID' and len(sparse_grads) == 0):
+        while True:
+            m = None
+            if search_p:
+                m = stat_collector.setup_manager()
 
-            process, cleanup = \
-                    launch_mpi_driver(driver_path,
-                                      args,
-                                      config)
-            process.wait()
-        elif config.run_option == 'PS' or \
-            (config.run_option == 'HYBRID' and len(dense_grads) == 0):
-            chief_worker_process, logfiles, cleanup = \
-                    launch_ps_driver(driver_path,
-                                     args,
-                                     config)
-            chief_worker_process.wait()
-        elif config.run_option == 'HYBRID':
-            process, cleanup = \
-                launch_hybrid_driver(driver_path,
-                                     args,
-                                     config)
-            process.wait()
+	    if config.run_option == 'MPI' or \
+		(config.run_option == 'HYBRID' and len(sparse_grads) == 0):
+                num_workers = sum([max(1, len(w['gpus'])) for w in config.resource_info['worker']])
+		processes, cleanup = \
+			launch_mpi_driver(driver_path,
+					  args,
+					  config,
+                                          p_to_test,
+                                          m)
+	    elif config.run_option == 'PS' or \
+		(config.run_option == 'HYBRID' and len(dense_grads) == 0):
+                num_workers = len(config.resource_info['worker'])
+		processes, logfiles, cleanup = \
+			launch_ps_driver(driver_path,
+					 args,
+					 config,
+                                         p_to_test,
+                                         m)
+	    elif config.run_option == 'HYBRID':
+                num_workers = sum([max(1, len(w['gpus'])) for w in config.resource_info['worker']])
+		processes, cleanup = \
+		    launch_hybrid_driver(driver_path,
+					 args,
+					 config,
+                                         p_to_test,
+                                         m)
+                
+            if not search_p:
+                processes[0].wait()
+                break
+            else:
+                search_p, p_to_test = \
+                    stat_collector.recv_exec_time(processes, cleanup, num_workers)
     except:
         traceback.print_exc()
     finally:
@@ -99,7 +254,6 @@ def _parallax_run_master(single_gpu_meta_graph_def,
                 cleanup(None, None)
             except:
                 parallax_log.debug("master runner ends")
-
 
 def parallel_run(single_gpu_graph,
                  resource_info,

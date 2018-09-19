@@ -37,6 +37,8 @@ flags.DEFINE_boolean('boundary_among_servers', True,
                      """Whether to use operation placement among servers""")
 flags.DEFINE_boolean('boundary_between_workers_and_servers', True,
                      """Whether to use operation placement between workers and servers""")
+flags.DEFINE_boolean('search_partitions', True,
+                     """Whether to use finding optimal partitions using Parallax""")
 FLAGS = flags.FLAGS
 
 def calculate_ckpt_steps():
@@ -75,6 +77,7 @@ def build_config():
     parallax_config = parallax.Config()
     parallax_config.run_option = FLAGS.run_option
     parallax_config.average_sparse = False
+    parallax_config.search_partitions = FLAGS.search_partitions
     parallax_config.communication_config = parallax.CommunicationConfig(ps_config, mpi_config)
     parallax_config.ckpt_config = ckpt_config
     parallax_config.profile_config = profile_config

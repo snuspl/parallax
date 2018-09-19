@@ -29,10 +29,12 @@ import horovod.tensorflow as hvd
 
 from parallax.core.python.common.lib import *
 from parallax.core.python.common.consts import *
+from parallax.core.python.common.partition import *
 from parallax.core.python.common.session_context import ParallaxSessionContext
 from parallax.core.python.mpi.graph_transform import graph_transform_mpi
 
-def create_mpi_script(driver_path, args, hostname, gpus, port=22):
+def create_mpi_script(driver_path, args, hostname, gpus, partitions,
+                      search, port=22):
 
     cmd = 'ssh -p %d %s "mkdir -p %s"' % (port, hostname, REMOTE_PARALLAX_ROOT)
     parallax_log.warning(colored('\n$ %s' % cmd, 'red'))
@@ -47,8 +49,11 @@ def create_mpi_script(driver_path, args, hostname, gpus, port=22):
         parallax_log_level = logging.INFO
     env = {
         "CUDA_VISIBLE_DEVICES": ','.join(str(gpuid) for gpuid in gpus),
-        "PARALLAX_LOG_LEVEL": parallax_log_level
+        "PARALLAX_LOG_LEVEL": parallax_log_level,
+        PARALLAX_SEARCH: search,
     }
+    if partitions:
+        env[PARALLAX_PARTITIONS] = partitions
 
     cmd_env = ' '.join(
         map(lambda (k, v): 'export %s=%s;' % (k, v), env.iteritems()))
@@ -68,13 +73,14 @@ def create_mpi_script(driver_path, args, hostname, gpus, port=22):
     proc.wait()
 
 
-def _prepare_workers(workers, driver_path, args):
+def _prepare_workers(workers, driver_path, args, partitions, search):
     for worker in workers:
-        _prepare_worker(worker, driver_path, args)
+        _prepare_worker(worker, driver_path, args, partitions, search)
 
 
-def _prepare_worker(worker, driver_path, args):
-    create_mpi_script(driver_path, args, worker['hostname'], worker['gpus'])
+def _prepare_worker(worker, driver_path, args, partitions, search):
+    create_mpi_script(driver_path, args, worker['hostname'], worker['gpus'],
+                      partitions, search)
 
 
 def _get_mpi_cmd(config):
@@ -102,21 +108,25 @@ def _get_mpi_cmd(config):
     return mpi_cmd
 
 
-def launch_mpi_driver(driver_path, args, config):
+def launch_mpi_driver(driver_path, args, config, partitions, m):
     workers = config.resource_info['worker']
-    _prepare_workers(workers, driver_path, args)
+    _prepare_workers(workers, driver_path, args, partitions, m is not None)
 
     mpi_cmd = _get_mpi_cmd(config)
 
     parallax_log.warning(colored('\n$ %s' % mpi_cmd, 'red'))
-    proc = subprocess.Popen(args=mpi_cmd, shell=True)
+    proc = subprocess.Popen(args=mpi_cmd, shell=True, preexec_fn=os.setsid)
 
     def cleanup_mpi(recv_signal, frame):
-        proc.kill()
+        if m:
+            m.shutdown()
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGINT)
+        except:
+            pass
 
     signal.signal(signal.SIGINT, cleanup_mpi)
-    return proc, cleanup_mpi
-
+    return [proc], cleanup_mpi
 
 def _init_global_vars(sess):
     hvd_bcast_global_vars_op = tf.get_default_graph() \
@@ -169,6 +179,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config,
                                    config.profile_config.profile_dir,
                                    config.profile_config.profile_steps,
                                    tensor_or_op_name_to_replica_names,
-                                   1)
+                                   1,
+                                   master=config.resource_info['master'][0])
         sess_context.set_parallax_session_context()
         return sess, num_workers, worker_id, 1

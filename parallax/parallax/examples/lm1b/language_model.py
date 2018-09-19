@@ -10,6 +10,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.layers import base
 
+import parallax
 
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_integer('num_variable_shards', 32, 'Number of variable shard')
@@ -18,7 +19,7 @@ class LM(base.Layer):
   def __init__(self, num_steps):
     super(LM, self).__init__()
     self.num_steps = num_steps
-    self.num_shards = FLAGS.num_variable_shards
+    self.num_shards = parallax.partition.get_partitions(FLAGS.num_variable_shards)
     # Use keep_prob 1.0 at evaluation
     self.keep_prob = 0.9
 

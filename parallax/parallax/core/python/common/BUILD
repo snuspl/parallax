@@ -60,6 +60,13 @@ native.py_library(
 )
 
 native.py_library(
+    name = "partition",
+    srcs = ["partition.py"],
+    deps = [
+    ],
+)
+
+native.py_library(
     name = "consts",
     srcs = ["consts.py"],
     deps = [
@@ -71,6 +78,7 @@ native.py_library(
     srcs = ["__init__.py"],
     deps = [
         "graph_transform_lib",
+        "partition",
         "runner",
         "shard",
         "config",

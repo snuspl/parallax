@@ -27,12 +27,13 @@ import tensorflow as tf
 from parallax.core.python.common import graph_transform_lib
 from parallax.core.python.common.lib import *
 from parallax.core.python.common.consts import *
+from parallax.core.python.common.partition import *
 from parallax.core.python.common.session_context import ParallaxSessionContext
 from parallax.core.python.ps.graph_transform import graph_transform_ps
 
 
 def _create_log_files(redirect_path, job, task_id):
-    directory = os.path.dirname(redirect_path)
+    directory = redirect_path
     if not os.path.exists(directory):
         os.makedirs(directory)
     directory = '%s/ps' % redirect_path
@@ -113,7 +114,7 @@ def _get_launch_worker_cmd(driver_path, args):
     return cmd
 
 
-def _get_worker_env(worker_id, config):
+def _get_worker_env(worker_id, config, partitions, search):
     workers = config.resource_info['worker']
     worker_info = workers[worker_id]
     num_workers = len(workers)
@@ -128,17 +129,20 @@ def _get_worker_env(worker_id, config):
         PARALLAX_RUN_OPTION: PARALLAX_RUN_PS,
         PARALLAX_RESOURCE_INFO: serialize_resource_info(config.resource_info),
         PARALLAX_WORKER_ID: worker_id,
-        PARALLAX_NUM_WORKERS: num_workers
+        PARALLAX_NUM_WORKERS: num_workers,
+        PARALLAX_SEARCH: search,
     }
+    if partitions:
+        env[PARALLAX_PARTITIONS] = partitions
 
     return env
 
 
-def launch_worker(driver_path, args, worker_id, config):
+def launch_worker(driver_path, args, worker_id, config, partitions, search):
     worker_info = config.resource_info['worker'][worker_id]
 
     cmd = _get_launch_worker_cmd(driver_path, args)
-    env = _get_worker_env(worker_id, config)
+    env = _get_worker_env(worker_id, config, partitions, search)
 
     # TODO: better mechanism for managing log files
     if config.redirect_path is not None:
@@ -157,7 +161,7 @@ def launch_worker(driver_path, args, worker_id, config):
         logfiles
 
 
-def launch_ps_driver(driver_path, args, config):
+def launch_ps_driver(driver_path, args, config, partitions, m):
     workers = config.resource_info['worker']
     pss = config.resource_info['ps'] if 'ps' in config.resource_info else []
 
@@ -167,7 +171,7 @@ def launch_ps_driver(driver_path, args, config):
     for worker_id in range(len(workers)):
         worker_proc, worker_logs =\
             launch_worker(driver_path, args, len(workers) - worker_id - 1,
-                          config)
+                          config, partitions, m is not None)
         logfiles += worker_logs
         if worker_id == 0:
             chief_worker_process = worker_proc
@@ -179,11 +183,16 @@ def launch_ps_driver(driver_path, args, config):
         processes.append(ps_proc)
 
     def cleanup_ps(recv_signal, frame):
+        if m is not None:
+            m.shutdown()
         for process in processes:
-            os.killpg(os.getpgid(process.pid), signal.SIGINT)
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGINT)
+            except OSError:
+                pass
 
     signal.signal(signal.SIGINT, cleanup_ps)
-    return chief_worker_process, logfiles, cleanup_ps
+    return processes, logfiles, cleanup_ps
 
 
 def _get_worker_info():
@@ -261,7 +270,8 @@ def parallax_run_ps(single_gpu_meta_graph_def, config,
                                               config.profile_config.profile_dir,
                                               config.profile_config.profile_steps,
                                               tensor_or_op_name_to_replica_names,
-                                              num_replicas_per_worker)
+                                              num_replicas_per_worker,
+                                              master=config.resource_info['master'][0])
         sess_context.set_parallax_session_context()
         return sess, num_workers, worker_id, num_replicas_per_worker
 

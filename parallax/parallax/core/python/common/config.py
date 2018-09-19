@@ -121,6 +121,7 @@ class ParallaxConfig(object):
                  average_sparse=False,
                  sess_config=None,
                  redirect_path=None,
+                 search_partitions=True,
                  communication_config=CommunicationConfig(),
                  ckpt_config=CheckPointConfig(),
                  profile_config=ProfileConfig()):
@@ -135,6 +136,8 @@ class ParallaxConfig(object):
           sess_config: tf.ConfigProto object to create the session with custom
             configurations.
           redirect_path: A string. Optional path to redirect logs as files.
+          search_partitions: A boolean. If true, Parallax searches optimal 
+            number of partitions for embedding parameters.
           communication_config: A `CommunicationConfig` object to manage the
             configurations related to communication.
           ckpt_config: A `CheckPointConfig` object to manage the checkpoints
@@ -145,6 +148,7 @@ class ParallaxConfig(object):
         self.average_sparse = average_sparse
         self.sess_config = sess_config
         self.redirect_path = redirect_path
+        self.search_partitions = search_partitions
 
         self.communication_config = communication_config
         self.ckpt_config = ckpt_config
