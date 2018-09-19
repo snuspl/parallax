@@ -116,16 +116,17 @@ class PartitionStatCollector(object):
 	                # search the oposite partitions
 			self.p_to_test = min(self.p_list) / 2
 		else:
+                    assert (self.prev_exec_time / curr_exec_time) > 1
 		    # keep increase or keep decrease
 		    if self.prev_p < curr_p:
-                        if (self.prev_exec_time / curr_exec_time) < 0.1:
+                        if (self.prev_exec_time / curr_exec_time) < 1.1:
                             # search the opposite partitions
                             self.p_to_test = min(self.p_list) / 2
                         else:
 			    self.p_to_test *= 2
 		    else:
 			self.p_to_test /= 2
-                        if (self.prev_exec_time / curr_exec_time) < 0.1:
+                        if (self.prev_exec_time / curr_exec_time) < 1.1:
                             stop = True
 
 		if self.p_to_test < self.min_partitions:

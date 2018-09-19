@@ -1,0 +1,28 @@
+{ "nmt": {
+    "parallax_driver": "/home/soojeong/parallax/parallax/parallax/examples/nmt/nmt_distributed_driver.py",
+    "args": [
+      "--src=de",
+      "--tgt=en",
+      "--hparams_path=/home/soojeong/parallax/parallax/parallax/examples/nmt/standard_hparams/wmt16_gnmt_8_layer.json",
+      "--out_dir=/tmp/nmt_out_soojeong",
+      "--vocab_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/vocab.bpe.32000",
+      "--train_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/train.tok.clean.bpe.32000",
+      "--dev_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/newstest2014.tok.bpe.32000",
+      "--test_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/newstest2015.tok.bpe.32000",
+      "--batch_size=128",
+      "--epoch_size=4500966",
+      "--steps_per_stats=50",
+      "--override_loaded_hparams=True",
+      "--random_seed=100"
+    ]
+  },
+  "lm1b": {
+    "parallax_driver": "/home/soojeong/parallax/parallax/parallax/examples/lm1b/lm1b_distributed_driver.py",
+    "args": [
+      "--datadir=/cmsdata/ssd1/cmslab/lm1b",
+      "--learning_rate=0.4",
+      "--batch_size=128",
+      "--log_frequency=50"
+    ]
+  }
+}
