@@ -187,6 +187,7 @@ def main(_):
                               sync=FLAGS.sync,
                               parallax_config=parallax_config.build_config())
     run(sess, num_workers, worker_id, num_replicas_per_worker)
+    os.system('kill %d' % os.getpid())
 
 if __name__ == "__main__":
     import logging
