@@ -121,6 +121,7 @@ def launch_hybrid_driver(driver_path, args, config, partitions, m):
     processes = []
     print(colored('\n$ %s' % hybrid_cmd, 'red'))
     proc = subprocess.Popen(args=hybrid_cmd, shell=True, preexec_fn=os.setsid)
+    processes.append(proc)
 
     pss = resource_info['ps'] if 'ps' in resource_info else []
     for ps_id in range(len(pss)):
@@ -138,7 +139,7 @@ def launch_hybrid_driver(driver_path, args, config, partitions, m):
             except:
               pass
 
-    return [proc] + processes, cleanup
+    return processes, cleanup
 
 def _init_global_vars(sess):
     hvd_bcast_global_vars_op = tf.get_default_graph() \
