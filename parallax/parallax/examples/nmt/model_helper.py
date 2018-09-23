@@ -306,7 +306,7 @@ def create_emb_for_encoder_and_decoder(share_vocab,
       size.
   """
 
-  num_partitons = parallax.partition.get_partitions(num_partitions)
+  num_partitions = parallax.partition.get_partitions(num_partitions)
   if num_partitions <= 1:
     partitioner = None
   else:
