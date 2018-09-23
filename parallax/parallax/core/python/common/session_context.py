@@ -58,7 +58,7 @@ def _parallax_run(self,
                 ret = self._run_internal(fetches, feed_dict)
                 end = time.time()
                 self.parallax_session_context._exec_time += (end - start)
-                if step == COLLECT_STAT_END:
+                if relative_step == COLLECT_STAT_END:
                     host = self.parallax_session_context._master['hostname']
                     port = int(self.parallax_session_context._master['port'][0])
                     BaseManager.register('queue')
@@ -66,6 +66,7 @@ def _parallax_run(self,
                     m.connect()
                     queue = m.queue()
                     queue.put(self.parallax_session_context._exec_time)
+                    self.parallax_session_context._send_exec_time = False
             else:
                 ret = self._run_internal(fetches, feed_dict)
         elif locked and self.parallax_session_context._is_profile_step(step):
