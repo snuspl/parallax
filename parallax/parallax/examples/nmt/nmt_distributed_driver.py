@@ -144,16 +144,16 @@ def main(_):
               init = train_model.iterator.initializer
               train_sess.run(init, feed_dict=feed_dict)
 
-          if worker_id == 0:
+          if True:
               results = train_sess.run([
                   train_model.model.update,
                   train_model.model.train_loss,
                   train_model.model.predict_count,
-                  train_model.model.train_summary,
+                  train_model.model.train_loss,
                   train_model.model.global_step,
                   train_model.model.word_count,
                   train_model.model.batch_size,
-                  train_model.model.grad_norm,
+                  train_model.model.batch_size,
                   train_model.model.learning_rate])
               step_result = [r[0] for r in results]
 
@@ -163,7 +163,7 @@ def main(_):
                    train_model.model.update])
           hparams.epoch_step += 1
 
-          if worker_id == 0:
+          if True:
               # Process step_result, accumulate stats, and write summary
               global_step, info["learning_rate"], step_summary = \
                   train.update_stats(stats, start_time, step_result)

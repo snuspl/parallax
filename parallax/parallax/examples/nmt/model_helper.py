@@ -258,7 +258,8 @@ def _create_pretrained_emb_from_txt(
 
 
 def _create_or_load_embed(embed_name, vocab_file, embed_file,
-                          vocab_size, embed_size, dtype):
+                          vocab_size, embed_size, dtype,
+                          num_partitions):
   """Create a new or load an existing embedding matrix."""
   if vocab_file and embed_file:
     embedding = _create_pretrained_emb_from_txt(vocab_file, embed_file)
@@ -266,7 +267,8 @@ def _create_or_load_embed(embed_name, vocab_file, embed_file,
     with tf.device(_get_embed_device(vocab_size)):
       embedding = tf.get_variable(
           embed_name, [vocab_size, embed_size], dtype)
-      embedding = tf.identity(embedding)
+      if num_partitions <= 1:
+          embedding = tf.identity(embedding)
   return embedding
 
 
@@ -334,18 +336,18 @@ def create_emb_for_encoder_and_decoder(share_vocab,
 
       embedding_encoder = _create_or_load_embed(
           "embedding_share", vocab_file, embed_file,
-          src_vocab_size, src_embed_size, dtype)
+          src_vocab_size, src_embed_size, dtype, num_partitions)
       embedding_decoder = embedding_encoder
     else:
       with tf.variable_scope("encoder", partitioner=partitioner):
         embedding_encoder = _create_or_load_embed(
             "embedding_encoder", src_vocab_file, src_embed_file,
-            src_vocab_size, src_embed_size, dtype)
+            src_vocab_size, src_embed_size, dtype, num_partitions)
 
       with tf.variable_scope("decoder", partitioner=partitioner):
         embedding_decoder = _create_or_load_embed(
             "embedding_decoder", tgt_vocab_file, tgt_embed_file,
-            tgt_vocab_size, tgt_embed_size, dtype)
+            tgt_vocab_size, tgt_embed_size, dtype, num_partitions)
 
   return embedding_encoder, embedding_decoder
 
