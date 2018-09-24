@@ -267,8 +267,6 @@ def _create_or_load_embed(embed_name, vocab_file, embed_file,
     with tf.device(_get_embed_device(vocab_size)):
       embedding = tf.get_variable(
           embed_name, [vocab_size, embed_size], dtype)
-      if num_partitions <= 1:
-          embedding = tf.identity(embedding)
   return embedding
 
 
