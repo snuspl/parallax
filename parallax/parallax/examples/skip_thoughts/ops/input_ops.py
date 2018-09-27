@@ -51,13 +51,16 @@ def parse_example_batch(serialized):
       })
 
   def _sparse_to_batch(sparse):
-    ids = tf.sparse_tensor_to_dense(sparse)  # Padding with zeroes.
+    ids = tf.sparse_tensor_to_dense(sparse)  # Padding with zeroes
     mask = tf.sparse_to_dense(sparse.indices, sparse.dense_shape,
                               tf.ones_like(sparse.values, dtype=tf.int32))
     return SentenceBatch(ids=ids, mask=mask)
 
   output_names = ("encode", "decode_pre", "decode_post")
-  return tuple(_sparse_to_batch(features[x]) for x in output_names)
+  ret = [_sparse_to_batch(features[x]) for x in output_names]
+  input_size = tf.size(features['encode'].indices)
+  ret.append(input_size)
+  return tuple(ret)
 
 
 def prefetch_input_data(reader,

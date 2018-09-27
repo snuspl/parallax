@@ -24,5 +24,13 @@
       "--batch_size=128",
       "--log_frequency=50"
     ]
+  },
+  "skip-thoughts": {
+    "parallax_driver": "/home/soojeong/parallax/parallax/parallax/examples/skip_thoughts/skip_distributed_driver.py",
+    "args": [
+      "--input_file_pattern=/cmsdata/ssd1/cmslab/skip_thoughts/data/train-?????-of-00100",
+      "--batch_size=128",
+      "--log_frequency=50"
+    ]
   }
 }

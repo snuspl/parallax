@@ -40,6 +40,7 @@ import sys
 import os
 
 import tensorflow as tf
+import parallax
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
@@ -149,7 +150,7 @@ class SkipThoughtsModel(object):
 
             # Deserialize a batch.
             serialized = input_queue.dequeue_many(self.config.batch_size)
-            encode, decode_pre, decode_post = input_ops.parse_example_batch(
+            encode, decode_pre, decode_post, self.input_size = input_ops.parse_example_batch(
                 serialized)
 
             encode_ids = encode.ids
@@ -190,10 +191,12 @@ class SkipThoughtsModel(object):
             decode_pre_emb = None
             decode_post_emb = None
         else:
+            partitions = parallax.partition.get_partitions(1)
             word_emb = tf.get_variable(
                 name="word_embedding",
                 shape=[self.config.vocab_size, self.config.word_embedding_dim],
-                initializer=self.uniform_initializer)
+                initializer=self.uniform_initializer,
+                partitioner=tf.fixed_size_partitioner(partitions))
 
             encode_emb = tf.nn.embedding_lookup(word_emb, self.encode_ids)
             decode_pre_emb = tf.nn.embedding_lookup(word_emb,

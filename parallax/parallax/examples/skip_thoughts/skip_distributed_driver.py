@@ -74,7 +74,11 @@ def main(_):
             optimizer=optimizer,
             global_step=model.global_step,
             clip_gradient_norm=training_config.clip_gradient_norm)
-
+        print("# Trainable variables")
+        params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        for param in params:
+            print("  %s, %s, %s" % (param.name, str(param.get_shape()),
+                                    param.op.device)) 
     def run(sess, num_workers, worker_id, num_replicas_per_worker):
         fetches = {
             'global_step':
@@ -83,18 +87,25 @@ def main(_):
                 model.total_loss,
             'train_op':
                 train_tensor,
+            'input_size':
+                model.input_size
         }
 
         start = time.time()
+        words = 0
         for i in range(FLAGS.max_steps):
             results = sess.run(fetches)
+            words += np.sum(results['input_size'])
+
             if i % FLAGS.log_frequency == 0:
                 end = time.time()
+                wps = words / float(end - start)
                 throughput = float(FLAGS.log_frequency) / float(end - start)
                 parallax.log.info(
-                    "global step: %d, loss: %f, throughput: %f steps/sec"
-                    % (results['global_step'][0], results['cost'][0], throughput))
+                    "global step: %d, loss: %f, throughput: %f steps/sec, wps: %f"
+                    % (results['global_step'][0], results['cost'][0], throughput, wps))
                 start = time.time()
+                words = 0
 
     sess, num_workers, worker_id, num_replicas_per_worker = \
         parallax.parallel_run(single_gpu_graph,
