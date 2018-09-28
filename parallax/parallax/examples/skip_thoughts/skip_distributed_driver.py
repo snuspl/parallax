@@ -17,6 +17,7 @@ import sys
 import os
 import json
 import time
+import numpy as np
 
 import tensorflow as tf
 from tensorflow.core.protobuf import config_pb2
