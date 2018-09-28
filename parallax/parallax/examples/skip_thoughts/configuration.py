@@ -29,8 +29,8 @@ class _HParams(object):
 
 
 def model_config(input_file_pattern=None,
-                 input_queue_capacity=640000,
-                 num_input_reader_threads=1,
+                 input_queue_capacity=64000,
+                 num_input_reader_threads=4,
                  shuffle_input_data=True,
                  uniform_init_scale=0.1,
                  vocab_size=20000,
