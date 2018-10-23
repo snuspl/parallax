@@ -23,6 +23,7 @@ import os
 from functools import reduce
 
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 import horovod.tensorflow as hvd
 
 from parallax.core.python.common.lib import *
@@ -63,15 +64,26 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info, machine_
 
     remote_cmd = 'echo \'%s\' | ' % mpi_script
     remote_cmd += 'ssh -p %d %s' % (port, hostname)
-    remote_cmd += ' \'cat > %s\' && chmod 777 %s' % (REMOTE_MPI_SCRIPT_PATH, REMOTE_MPI_SCRIPT_PATH)
+    remote_cmd += ' \'cat > %s\' && chmod 777 %s' % (REMOTE_MPI_SCRIPT_PATH,
+                                                     REMOTE_MPI_SCRIPT_PATH)
     print(colored('\n$ %s' % remote_cmd, 'red'))
     proc = subprocess.Popen(args=remote_cmd, shell=True)
     proc.wait()
 
 
 def _prepare_workers(workers, driver_path, args, resource_info):
-    for i, worker in enumerate(workers):
-        _prepare_worker(worker, driver_path, args, resource_info, i)
+    unique_workers = {}
+    machines = []
+    for worker in workers:
+        hostname = worker['hostname']
+        if hostname in unique_workers:
+            unique_workers[hostname]['gpus'].extend(worker['gpus'])
+        else:
+            machines.append(hostname)
+            unique_workers[hostname] = worker
+
+    for i, hostname in enumerate(machines):
+        _prepare_worker(unique_workers[hostname], driver_path, args, resource_info, i)
 
 
 def _prepare_worker(worker, driver_path, args, resource_info, machine_id):
@@ -84,7 +96,7 @@ def _get_hybrid_cmd(workers, protocol, redirect_path, mpi_cmd_in_config):
               ' -mca orte_base_help_aggregate 0'\
               ' -x NCCL_DEBUG=INFO'
     arg_runop = '-x %s=%s' % (PARALLAX_RUN_OPTION, PARALLAX_RUN_HYBRID)
-    num_process = reduce(lambda s, x: s + len(x['gpus']), workers, 0)
+    num_process = reduce(lambda s, x: s + max(len(x['gpus']), 1), workers, 0)
     arg_np = '-np %d' % num_process
     arg_host = '-H %s' % get_cluster_str_for_hosts(workers, with_slots=True)
     arg_redir = '-output-filename %s' % os.path.join(redirect_path, 'worker') \
@@ -155,13 +167,9 @@ def get_tf_clusterspec_for_hybrid(resource_info):
         hosts = resource_info[job]
         tf_cluster_dict[job] = []
         for host in hosts:
-            if len(host['gpus']) == 0:
+            for i in range(max(len(host['gpus']), 1)):
                 tf_cluster_dict[job].append(
-                    '%s:%d' % (host['hostname'], host['port'][0]))
-            else:
-                for i in range(len(host['gpus'])):
-                    tf_cluster_dict[job].append(
-                        '%s:%d' % (host['hostname'], host['port'][i]))
+                    '%s:%d' % (host['hostname'], host['port'][i]))
     cluster_spec = tf.train.ClusterSpec(tf_cluster_dict)
     return cluster_spec
 
@@ -179,12 +187,21 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
     sess_config = config.sess_config
     if sess_config is None:
         sess_config = tf.ConfigProto(allow_soft_placement=True)
-    sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
+    local_device_protos = device_lib.list_local_devices()
+    gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
+    if gpus:
+        sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
     cluster_spec = get_tf_clusterspec_for_hybrid(config.resource_info)
+    machine_to_ids = {}
+    for w in config.resource_info['worker']:
+      if w['hostname'] not in machine_to_ids:
+          machine_to_ids[w['hostname']] = len(machine_to_ids)
     worker_id = 0
-    for i in range(machine_id):
-      worker_id += len(config.resource_info['worker'][i]['gpus'])
+    for w in config.resource_info['worker']:
+        if machine_to_ids[w['hostname']] < machine_id:
+            worker_id += max(1, len(w['gpus']))
     worker_id += hvd.local_rank()
+    print(worker_id)
     server = tf.train.Server(cluster_spec, job_name='worker',
                              task_index=worker_id, protocol=config.communication_config.ps_config.protocol,
                              config=sess_config)

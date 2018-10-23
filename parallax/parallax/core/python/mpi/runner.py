@@ -25,6 +25,7 @@ import uuid
 from functools import reduce
 
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 import horovod.tensorflow as hvd
 
 from parallax.core.python.common.lib import *
@@ -62,14 +63,23 @@ def create_mpi_script(driver_path, args, hostname, gpus, port=22):
 
     remote_cmd = 'echo \'%s\' | ' % mpi_script
     remote_cmd += 'ssh -p %d %s' % (port, hostname)
-    remote_cmd += ' \'cat > %s; chmod 777 %s\'' % (REMOTE_MPI_SCRIPT_PATH, REMOTE_MPI_SCRIPT_PATH)
+    remote_cmd += ' \'cat > %s; chmod 777 %s\'' % (REMOTE_MPI_SCRIPT_PATH,
+                                                   REMOTE_MPI_SCRIPT_PATH)
     parallax_log.warning(colored('\n$ %s' % remote_cmd, 'red'))
     proc = subprocess.Popen(args=remote_cmd, shell=True)
     proc.wait()
 
 
-def _prepare_workers(workers, driver_path, args):
+def _prepare_workers(workers, driver_path, args, port=22):
+    unique_workers = {}
     for worker in workers:
+        hostname = worker['hostname']
+        if hostname in unique_workers:
+            unique_workers[hostname]['gpus'].extend(worker['gpus'])
+        else:
+            unique_workers[hostname] = worker
+
+    for host, worker in unique_workers.iteritems():
         _prepare_worker(worker, driver_path, args)
 
 
@@ -86,8 +96,9 @@ def _get_mpi_cmd(config):
 
     arg_runop = '-x %s=%s' % (PARALLAX_RUN_OPTION,
                               PARALLAX_RUN_MPI)
-    arg_resource = '-x %s=%s' % (PARALLAX_RESOURCE_INFO, serialize_resource_info(config.resource_info))
-    num_process = reduce(lambda s, x: s + len(x['gpus']), workers, 0)
+    arg_resource = '-x %s=%s' % (PARALLAX_RESOURCE_INFO,
+                                 serialize_resource_info(config.resource_info))
+    num_process = reduce(lambda s, x: s + max(1, len(x['gpus'])), workers, 0)
     arg_np = '-np %d' % num_process
     arg_host = '-H %s' % get_cluster_str_for_hosts(workers, with_slots=True)
     arg_out = ''
@@ -144,7 +155,10 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config):
         sess_config = config.sess_config
         if sess_config is None:
             sess_config = tf.ConfigProto(allow_soft_placement=True)
-        sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
+        local_device_protos = device_lib.list_local_devices()
+        gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
+        if gpus:
+            sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
         sess = tf.train.MonitoredTrainingSession(
                 is_chief=True,
                 checkpoint_dir=config.get_ckpt_config().ckpt_dir if worker_id == 0 else None,

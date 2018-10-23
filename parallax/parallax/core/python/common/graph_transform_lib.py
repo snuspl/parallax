@@ -30,6 +30,7 @@ from tensorflow.core.protobuf import meta_graph_pb2
 from tensorflow.core.protobuf import queue_runner_pb2
 from tensorflow.core.protobuf import rewriter_config_pb2
 from tensorflow.python import pywrap_tensorflow as c_api
+from tensorflow.python.client import device_lib
 from tensorflow.python.framework import c_api_util
 from tensorflow.python.framework import ops
 from tensorflow.python.grappler import tf_optimizer
@@ -580,8 +581,14 @@ def add_sync_op(worker_id,
         _replace_update_op_with_read_op(var_op, var_update_op, finish_op)
 
 def replicate_variables_to_devices(meta_graph_def,
-                                    worker_device,
-                                    num_replicas_per_worker):
+                                   worker_device,
+                                   num_replicas_per_worker):
+
+    local_device_protos = device_lib.list_local_devices()
+    gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
+    assert (len(gpus) == 0 and num_replicas_per_worker == 1) or \
+           len(gpus) >= num_replicas_per_worker
+
     var_op_name_to_original_device_str = {}
     for node in meta_graph_def.graph_def.node:
         if 'Variable' in node.op:
@@ -609,7 +616,7 @@ def replicate_variables_to_devices(meta_graph_def,
         mirror_var_device = tf.DeviceSpec(job=worker_device.job,
                                           replica=worker_device.replica,
                                           task=worker_device.task)
-        if original_var_device.device_type in ['CPU', 'cpu']:
+        if original_var_device.device_type in ['CPU', 'cpu'] or len(gpus) == 0:
             # place replicated variable on CPU
             mirror_var_device.device_type = 'CPU'
             mirror_var_device.device_index = 0
@@ -861,6 +868,9 @@ def construct_multi_gpu_graph_def(single_gpu_graph_def,
                                   op_names_to_share,
                                   num_replicas,
                                   tensor_or_op_name_to_replica_names):
+    local_device_protos = device_lib.list_local_devices()
+    gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
+    assert (len(gpus) == 0 and num_replicas == 1) or len(gpus) >= num_replicas
     def _update_colocation(node, replica_id=None):
         if '_class' not in node.attr:
             return
@@ -909,10 +919,13 @@ def construct_multi_gpu_graph_def(single_gpu_graph_def,
                                            parallax_replica_prefix(replica_id))
                 if 'CPU' not in new_node.device \
                         and 'cpu' not in new_node.device:
-                    new_node.device = \
-                        '%s/device:GPU:%d' \
-                        % (new_node.device[:new_node.device.find('/device')],
-                           replica_id)
+                    if len(gpus) > 0:
+                        new_node.device = '%s/device:GPU:%d' \
+                            % (new_node.device[:new_node.device.find('/device')],
+                               replica_id)
+                    else:
+                        new_node.device = '%s/device:CPU:0' \
+                            % (new_node.device[:new_node.device.find('/device')])
                 for i in range(len(new_node.input)):
                     if _get_op_name(new_node.input[i]) in op_names_to_replicate:
                         new_node.input[i] = \
@@ -1554,6 +1567,7 @@ def add_aggregate_gradients_ops_only_between(multi_gpu_meta_graph_def,
 def add_sync_op_only_between(worker_id,
                              local_worker_id,
                              machine_id,
+                             num_total_workers,
                              num_local_workers,
                              num_worker_machines,
                              master_var_op_to_mirror_vars,
@@ -1582,7 +1596,7 @@ def add_sync_op_only_between(worker_id,
 
     def _get_accum_apply_and_agg_grad(var, grad, indices, dense_shape):
         var_op = var.op
-        num_required = num_worker_machines if local_aggregation else num_worker_machines * num_local_workers
+        num_required = num_worker_machines if local_aggregation else num_total_workers
         if indices is None:
             assert False # hybrid does not use this function
             grad_accum = tf.ConditionalAccumulator(
@@ -1669,7 +1683,7 @@ def add_sync_op_only_between(worker_id,
                               shared_name='auto_parallel_%s'
                                           '_update_sync_queue_%d'
                                           % (global_grad_values.name, i))
-                        for i in range(num_worker_machines * num_local_workers)]
+                        for i in range(num_total_workers)]
                 token = tf.constant(False)
                 queue_ops = []
                 if worker_id == 0:

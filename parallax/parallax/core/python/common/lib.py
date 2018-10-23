@@ -99,9 +99,12 @@ def remote_exec(bash_script,
 
 
 def _get_available_gpus(hostname):
-    result = subprocess.check_output('ssh %s ls /proc/driver/nvidia/gpus' % hostname, shell=True)
-    return list(range(len(result.strip().split('\n'))))
-
+    try:
+        result = subprocess.check_output('ssh %s ls /proc/driver/nvidia/gpus' % hostname, shell=True)
+        result = list(range(len(result.strip().split('\n')))) # FOR TEST
+        return result
+    except subprocess.CalledProcessError:
+        return []
 
 def _get_empty_port(hostname, num_ports):
     try:
@@ -178,7 +181,7 @@ def deserialize_resource_info(resource_info_serialized):
 def get_cluster_str_for_hosts(hosts, with_slots):
     if with_slots:
         return ','.join(
-            map(lambda host: '%s:%d' % (host['hostname'], len(host['gpus'])),
+            map(lambda host: '%s:%d' % (host['hostname'], max(1, len(host['gpus']))),
                 hosts))
     else:
         host_list = []
