@@ -1647,7 +1647,9 @@ def add_sync_op_only_between(worker_id,
                   with tf.control_dependencies(assign_global_grad_buf):
                     for i,q in enumerate(grad_update_sync_queues):
                       if i != worker_id:
-                         queue_ops.append(q.enqueue(token))
+                          queue_ops.append(q.enqueue(token))
+                      else:
+                          queue_ops.append(tf.no_op())
                 else:
                     queue_ops.append(grad_update_sync_queues[worker_id].dequeue())
                   
