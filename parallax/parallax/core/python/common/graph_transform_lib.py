@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
+import copy
 import re
 import sys
 import time
@@ -134,13 +135,13 @@ def update_consumers(consumers, old_tensor, new_tensor):
             if x == old_tensor:
                 consumer_op._update_input(i, new_tensor)
 
-
 def update_control_consumers(control_consumer_ops, old_op, new_op):
     for control_consumer_op in control_consumer_ops:
-        control_consumer_op.control_inputs.remove(old_op)
-        control_consumer_op.control_inputs.append(new_op)
-        control_consumer_op._recompute_node_def()
-
+         control_inputs = copy.copy(control_consumer_op.control_inputs)
+         control_inputs.remove(old_op)
+         control_inputs.append(new_op)
+         control_consumer_op._remove_all_control_inputs()
+         control_consumer_op._add_control_inputs(control_inputs)
 
 # Starting from start_ops, follow the computation graph from consumer to input
 # to find ancestors. Stop navigating the graph at end_ops. Include both
@@ -1648,6 +1649,8 @@ def add_sync_op_only_between(worker_id,
                     for i,q in enumerate(grad_update_sync_queues):
                       if i != worker_id:
                          queue_ops.append(q.enqueue(token))
+                      else:
+                         queue_ops.append(tf.no_op())
                 else:
                     queue_ops.append(grad_update_sync_queues[worker_id].dequeue())
                   
