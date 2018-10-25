@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import language_model_graph
+
 import tensorflow as tf
 import parallax
-from parallax.core.python.common.lib import *
-
-import math
-import json
 
 flags = tf.app.flags
 flags.DEFINE_boolean('replicate_variables', True, """replicate_variables""")
@@ -31,7 +27,6 @@ flags.DEFINE_string('redirect_path', None, """redirect path to keep the log of d
 flags.DEFINE_string('ckpt_dir', None, """Directory to save checkpoints""")
 flags.DEFINE_integer('save_ckpt_steps', None,
                      """Number of steps between two consecutive checkpoints""")
-flags.DEFINE_integer('save_n_ckpts_per_epoch', -1, """Save n checkpoints per every epoch""")
 flags.DEFINE_string('profile_dir', None, """Directory to save RunMetadata""")
 flags.DEFINE_string('profile_steps', None, """Comma separated porfile steps""")
 flags.DEFINE_boolean('local_aggregation', True,
@@ -42,28 +37,10 @@ flags.DEFINE_boolean('boundary_between_workers_and_servers', True,
                      """Whether to use operation placement between workers and servers""")
 FLAGS = flags.FLAGS
 
-def calculate_ckpt_steps():
-
-    if FLAGS.save_n_ckpts_per_epoch > 0:
-        num_workers = 0
-        with open(FLAGS.resource_info_file) as resource_info:
-            for machine_str in resource_info:
-                num_workers += len(parse_machine_info(machine_str)[0][1])
-        parallax.log.info('Num workers : %d' % num_workers)
-        num_words_per_iter = FLAGS.batch_size * FLAGS.num_steps * num_workers
-        num_iters_per_epoch = math.ceil(language_model_graph._NUM_WORDS['train'] / num_words_per_iter / FLAGS.save_n_ckpts_per_epoch)
-        save_ckpt_steps = num_iters_per_epoch if FLAGS.sync else num_iters_per_epoch * num_workers
-        parallax.log.info('Save checkpoint for every %d iters' % save_ckpt_steps)
-    else:
-        save_ckpt_steps = FLAGS.save_ckpt_steps
-
-    return save_ckpt_steps
-
-
 def build_config():
 
     ckpt_config = parallax.CheckPointConfig(ckpt_dir=FLAGS.ckpt_dir,
-                                            save_ckpt_steps=calculate_ckpt_steps())
+                                            save_ckpt_steps=FLAGS.save_ckpt_steps)
     ps_config = parallax.PSConfig(replicate_variables=FLAGS.replicate_variables,
                                   protocol=FLAGS.protocol,
                                   local_aggregation=FLAGS.local_aggregation,
