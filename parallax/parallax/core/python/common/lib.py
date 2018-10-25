@@ -118,7 +118,7 @@ def _get_empty_port(hostname, num_ports):
     return ports
 
 
-def _parse_machine_info(machine_str):
+def parse_machine_info(machine_str):
     hostname_gpus = machine_str.split(':')
     if len(hostname_gpus) > 0:
         hostname = hostname_gpus[0]
@@ -137,7 +137,7 @@ def parse_resource_info(path, run_option):
     machines = []
     with open(path) as file:
         for machine_info in file:
-            machines.extend(_parse_machine_info(machine_info.strip()))
+            machines.extend(parse_machine_info(machine_info.strip()))
 
     ps = [{'hostname': hostname, 'port': _get_empty_port(hostname, 1), 'gpus': []} for hostname, _ in machines]
     worker = [{'hostname': hostname, 

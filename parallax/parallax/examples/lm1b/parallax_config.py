@@ -15,6 +15,7 @@
 
 import tensorflow as tf
 import parallax
+from parallax.core.python.common.lib import *
 import json
 
 flags = tf.app.flags
@@ -40,15 +41,19 @@ flags.DEFINE_boolean('boundary_between_workers_and_servers', True,
 FLAGS = flags.FLAGS
 
 def calculate_ckpt_steps():
+
     if FLAGS.save_n_ckpts_per_epoch > 0:
-      with open(FLAGS.resource_info_file) as resource_info:
-        num_workers = sum([len(w['gpus']) for w in json.load(resource_info)['worker']])
-      num_words_per_iter = FLAGS.batch_size * FLAGS.num_steps * num_workers
-      num_iters_per_epoch = math.ceil(language_model_graph._NUM_WORDS['train'] / num_words_per_iter / FLAGS.save_n_ckpts_per_epoch)
-      save_ckpt_steps = num_iters_per_epoch if FLAGS.sync else num_iters_per_epoch * num_workers
-      parallax.log.info('Save checkpoint for every %d iters' % save_ckpt_steps)
+        num_workers = 0
+        with open(FLAGS.resource_info_file) as resource_info:
+            for machine_str in resource_info:
+                num_workers += len(parse_machine_info(machine_str)[0][1])
+        parallax.log.info('Num workers : %d' % num_workers)
+        num_words_per_iter = FLAGS.batch_size * FLAGS.num_steps * num_workers
+        num_iters_per_epoch = math.ceil(language_model_graph._NUM_WORDS['train'] / num_words_per_iter / FLAGS.save_n_ckpts_per_epoch)
+        save_ckpt_steps = num_iters_per_epoch if FLAGS.sync else num_iters_per_epoch * num_workers
+        parallax.log.info('Save checkpoint for every %d iters' % save_ckpt_steps)
     else:
-      save_ckpt_steps = FLAGS.save_ckpt_steps
+        save_ckpt_steps = FLAGS.save_ckpt_steps
 
     return save_ckpt_steps
 
