@@ -15,7 +15,7 @@
 
 import tensorflow as tf
 import parallax
-
+import json
 
 flags = tf.app.flags
 flags.DEFINE_boolean('replicate_variables', True, """replicate_variables""")
