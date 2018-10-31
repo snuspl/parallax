@@ -38,6 +38,8 @@ flags.DEFINE_boolean('boundary_among_servers', True,
                      """Whether to use operation placement among servers""")
 flags.DEFINE_boolean('boundary_between_workers_and_servers', True,
                      """Whether to use operation placement between workers and servers""")
+flags.DEFINE_string('export_graph_path', None, """export path to keep transformed graph definintion""")
+
 FLAGS = flags.FLAGS
 
 def calculate_ckpt_steps():
@@ -81,5 +83,6 @@ def build_config():
     parallax_config.ckpt_config=ckpt_config
     parallax_config.profile_config = profile_config
     parallax_config.redirect_path = FLAGS.redirect_path
+    parallax_config.export_graph_path = FLAGS.export_graph_path
 
     return parallax_config
