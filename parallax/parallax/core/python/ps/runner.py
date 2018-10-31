@@ -198,8 +198,7 @@ def _get_worker_info():
     return worker_id, num_workers
 
 
-def parallax_run_ps(single_gpu_meta_graph_def, config,
-                    export_graph=True):
+def parallax_run_ps(single_gpu_meta_graph_def, config):
     worker_id, num_workers = _get_worker_info()
     num_replicas_per_worker = len(config.resource_info['worker'][worker_id]['gpus'])
 
@@ -218,8 +217,8 @@ def parallax_run_ps(single_gpu_meta_graph_def, config,
     with tf.Graph().as_default() as graph_to_run:
         parallax_log.debug("Importing PS graph on worker %d" % worker_id)
         tf.train.import_meta_graph(ps_meta_graph_def)
-        if export_graph:
-            export_ps_meta_graph(worker_id)
+        if config.export_graph_path:
+            export_ps_meta_graph(config.export_graph_path, worker_id)
 
         replicated_var_init_op = None
         try:

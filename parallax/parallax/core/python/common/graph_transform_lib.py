@@ -138,8 +138,11 @@ def update_consumers(consumers, old_tensor, new_tensor):
 def update_control_consumers(control_consumer_ops, old_op, new_op):
     for control_consumer_op in control_consumer_ops:
          control_inputs = copy.copy(control_consumer_op.control_inputs)
+         size = len(control_inputs)
          control_inputs.remove(old_op)
+         assert size - 1 == len(control_inputs)
          control_inputs.append(new_op)
+         assert size == len(control_inputs)
          control_consumer_op._remove_all_control_inputs()
          control_consumer_op._add_control_inputs(control_inputs)
 

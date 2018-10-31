@@ -255,18 +255,18 @@ def get_average_execution_time(master, num_workers):
     return total_exec_time / num_workers
 
 
-def export_mpi_meta_graph(worker_id):
-    _export_meta_graph(worker_id, 'mpi', 'MPI')
+def export_mpi_meta_graph(export_dir, worker_id):
+    _export_meta_graph(export_dir, worker_id, 'mpi', 'MPI')
 
-def export_ps_meta_graph(worker_id):
-    _export_meta_graph(worker_id, 'ps', 'PS')
+def export_ps_meta_graph(export_dir, worker_id):
+    _export_meta_graph(export_dir, worker_id, 'ps', 'PS')
 
-def export_hybrid_meta_graph(worker_id):
-    _export_meta_graph(worker_id, 'hybrid', 'HYBRID')    
+def export_hybrid_meta_graph(export_dir, worker_id):
+    _export_meta_graph(export_dir, worker_id, 'hybrid', 'HYBRID')    
  
-def _export_meta_graph(worker_id, dir, tag):
+def _export_meta_graph(export_dir, worker_id, comm, tag):
     export_meta_graph_path = \
-        os.path.join(REMOTE_PARALLAX_ROOT, dir,
+        os.path.join(export_dir, comm,
                      'worker-%d-%s' % (worker_id, str(uuid.uuid4())))
     parallax_log.debug("Exporting %s graph of worker %d to %s"
                       % (tag, worker_id, export_meta_graph_path))
