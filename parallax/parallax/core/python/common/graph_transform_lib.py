@@ -527,10 +527,7 @@ def add_sync_op(worker_id,
                 token = tf.constant(False)
                 with tf.control_dependencies(var_update_deps):
                     for i, q in enumerate(var_update_sync_queues):
-                        if i != worker_id:
-                            queue_ops.append(q.enqueue(token))
-                        else:
-                            queue_ops.append(tf.no_op())
+                        queue_ops.append(q.enqueue(token))
             else:
                 # wait for execution of var_update_op
                 if is_trainable:
