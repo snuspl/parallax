@@ -92,7 +92,7 @@ DEQUEUE_OP_TYPES = [
     "QueueDequeue", "QueueDequeueV2",
     "QueueDequeueUpTo", "QueueDequeueUpToV2"]
 ITERATOR_OP_TYPES = [
-    "Iterator"
+    "Iterator", "IteratorV2"
 ]
 
 UPDATE_OP_VAR_POS = 0
