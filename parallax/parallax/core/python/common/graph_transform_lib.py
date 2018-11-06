@@ -701,13 +701,19 @@ def replicate_variables_to_devices(meta_graph_def,
 def update_shard_values_for_worker(num_workers, worker_id):
     num_shards_per_worker = 1
     for num_shards in tf.get_collection(shard.NUM_SHARDS):
+        num_shards_tensor = num_shards.op.node_def.attr["value"].tensor
         num_shards_per_worker = \
-            num_shards.op.node_def.attr["value"].tensor.int64_val[0]
-        num_shards.op.node_def.attr["value"].tensor.int64_val[0] *= num_workers
+            num_shards_tensor.int64_val[0]
+        num_shards_tensor.int64_val[0] *= num_workers
+        num_shards.op._set_attr("value", attr_value_pb2.AttrValue(tensor=num_shards_tensor))
+        assert num_shards.op.node_def.attr["value"].tensor.int64_val[0] == num_shards_per_worker * num_workers
 
     for shard_id in tf.get_collection(shard.SHARD_ID):
-        shard_id.op.node_def.attr["value"].tensor.int64_val[0] += \
+        shard_id_tensor = shard_id.op.node_def.attr["value"].tensor
+        shard_id_tensor.int64_val[0] += \
             num_shards_per_worker * worker_id
+        shard_id.op._set_attr("value", attr_value_pb2.AttrValue(tensor=shard_id_tensor))
+        assert shard_id.op.node_def.attr["value"].tensor.int64_val[0] == shard_id_tensor.int64_val[0]
 
     # find and update dataset with shard filter predicate
     if len(tf.get_collection(shard.SHARD_FILTER_PRED)) > 0:
