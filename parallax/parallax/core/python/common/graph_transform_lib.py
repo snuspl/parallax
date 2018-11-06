@@ -30,6 +30,8 @@ from tensorflow.core.protobuf import gradients_info_pb2
 from tensorflow.core.protobuf import meta_graph_pb2
 from tensorflow.core.protobuf import queue_runner_pb2
 from tensorflow.core.protobuf import rewriter_config_pb2
+from tensorflow.python import pywrap_tensorflow as c_api
+from tensorflow.python.framework import c_api_util
 from tensorflow.python.framework import ops
 from tensorflow.python.grappler import tf_optimizer
 from tensorflow.python.ops import array_ops
@@ -722,8 +724,8 @@ def update_shard_values_for_worker(num_workers, worker_id):
             if 'dataset_factory' not in op.node_def.attr:
                 continue
             func_name = op.node_def.attr['dataset_factory'].func.name
-            dataset_factory_func_def = \
-                tf.get_default_graph()._functions[func_name].definition
+            dataset_factory_func = tf.get_default_graph()._get_function(func_name)
+            dataset_factory_func_def = dataset_factory_func.definition
             node_name_to_node = {}
             for node in dataset_factory_func_def.node_def:
                 node_name_to_node[node.name] = node
@@ -744,8 +746,26 @@ def update_shard_values_for_worker(num_workers, worker_id):
                         num_workers
                     shard_id_node.attr['value'].tensor.int64_val[0] += \
                         num_shards_per_worker * worker_id
-                    break
+                    if dataset_factory_func._c_func:
+                        # update dataset factory name
+                        func_name = '%s_%d' % (func_name, shard_id_node.attr['value'].tensor.int64_val[0])
+                        dataset_factory_func._func_name = func_name
+                        dataset_factory_func_def.signature.name = func_name
 
+                        serialized = dataset_factory_func_def.SerializeToString()
+                        c_func = c_api.TF_FunctionImportFunctionDef(serialized)
+                        dataset_factory_func._c_func = \
+                            c_api_util.ScopedTFFunction(c_func)
+
+                        #TODO: remove old dataset factory function
+                        tf.get_default_graph()._add_function(dataset_factory_func)
+                        op_func = op.node_def.attr['dataset_factory'].func
+                        op_func.name = func_name
+                        op._set_attr('dataset_factory', 
+                                     attr_value_pb2.AttrValue(func=op_func))
+                        break
+
+            assert dataset_factory_func == tf.get_default_graph()._get_function(func_name)
 
 def _get_shared_name_to_stage_ops(ops):
     stage_ops = [op for op in ops if op.type in STAGE_OP_TYPES]
