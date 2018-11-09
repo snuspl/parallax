@@ -32,6 +32,7 @@ LOCAL_LAUNCH_PS_PATH = os.path.join(LOCAL_CODE_ROOT, 'tools',
 
 REMOTE_PARALLAX_ROOT = os.path.join('/tmp', 'parallax-%s' % os.environ['USER'])
 REMOTE_LAUNCH_PS_PATH = os.path.join(REMOTE_PARALLAX_ROOT, 'launch_ps.py')
+REMOTE_MPI_SCRIPT_PATH = os.path.join(REMOTE_PARALLAX_ROOT, 'mpi_run.sh')
 
 NUM_ITERATIONS_FOR_TEST = 200
 NUM_ITERATIONS_FOR_WARMUP = 200
