@@ -13,7 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 
-import copy
 import re
 import sys
 import time
@@ -137,7 +136,7 @@ def update_consumers(consumers, old_tensor, new_tensor):
 
 def update_control_consumers(control_consumer_ops, old_op, new_op):
     for control_consumer_op in control_consumer_ops:
-         control_inputs = copy.copy(control_consumer_op.control_inputs)
+         control_inputs = list(control_consumer_op.control_inputs)
          size = len(control_inputs)
          control_inputs.remove(old_op)
          assert size - 1 == len(control_inputs)
@@ -526,8 +525,11 @@ def add_sync_op(worker_id,
                 # after executing variable update
                 token = tf.constant(False)
                 with tf.control_dependencies(var_update_deps):
-                    for i, q in enumerate(var_update_sync_queues):
-                        queue_ops.append(q.enqueue(token))
+                   for i, q in enumerate(var_update_sync_queues):
+                        if i != worker_id:
+                            queue_ops.append(q.enqueue(token))
+                        else:
+                            queue_ops.append(tf.no_op())
             else:
                 # wait for execution of var_update_op
                 if is_trainable:
@@ -1648,9 +1650,9 @@ def add_sync_op_only_between(worker_id,
                   with tf.control_dependencies(assign_global_grad_buf):
                     for i,q in enumerate(grad_update_sync_queues):
                       if i != worker_id:
-                         queue_ops.append(q.enqueue(token))
+                          queue_ops.append(q.enqueue(token))
                       else:
-                         queue_ops.append(tf.no_op())
+                          queue_ops.append(tf.no_op())
                 else:
                     queue_ops.append(grad_update_sync_queues[worker_id].dequeue())
                   
