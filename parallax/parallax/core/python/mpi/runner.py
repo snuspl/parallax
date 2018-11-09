@@ -62,7 +62,8 @@ def create_mpi_script(driver_path, args, hostname, gpus, port=22):
 
     remote_cmd = 'echo \'%s\' | ' % mpi_script
     remote_cmd += 'ssh -p %d %s' % (port, hostname)
-    remote_cmd += ' \'cat > %s; chmod 777 %s\'' % (REMOTE_MPI_SCRIPT_PATH, REMOTE_MPI_SCRIPT_PATH)
+    remote_mpi_script_path = os.path.join(REMOTE_PARALLAX_ROOT, 'mpi_run_%d.sh' % machine_id)
+    remote_cmd += ' \'cat > %s; chmod 777 %s\'' % (remote_mpi_script_path, remote_mpi_script_path)
     parallax_log.warning(colored('\n$ %s' % remote_cmd, 'red'))
     proc = subprocess.Popen(args=remote_cmd, shell=True)
     proc.wait()
@@ -87,7 +88,7 @@ def _get_mpi_cmd(config):
     arg_runop = '-x %s=%s' % (PARALLAX_RUN_OPTION,
                               PARALLAX_RUN_MPI)
     arg_resource = '-x %s=%s' % (PARALLAX_RESOURCE_INFO, serialize_resource_info(config.resource_info))
-    num_process = reduce(lambda s, x: s + len(x['gpus']), workers, 0)
+    num_process = reduce(lambda s, x: s + max(1, len(x['gpus'])), workers, 0)
     arg_np = '-np %d' % num_process
     arg_host = '-H %s' % get_cluster_str_for_hosts(workers, with_slots=True)
     arg_out = ''

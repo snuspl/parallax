@@ -99,9 +99,11 @@ def remote_exec(bash_script,
 
 
 def _get_available_gpus(hostname):
-    result = subprocess.check_output('ssh %s ls /proc/driver/nvidia/gpus' % hostname, shell=True)
-    return list(range(len(result.strip().split('\n'))))
-
+    try:
+        result = subprocess.check_output('ssh %s ls /proc/driver/nvidia/gpus' % hostname, shell=True)
+        return list(range(len(result.strip().split('\n'))))
+    except subprocess.CalledProcessError:
+        return []
 
 def _get_empty_port(hostname, num_ports):
     try:

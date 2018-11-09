@@ -63,7 +63,8 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info, machine_
 
     remote_cmd = 'echo \'%s\' | ' % mpi_script
     remote_cmd += 'ssh -p %d %s' % (port, hostname)
-    remote_cmd += ' \'cat > %s\' && chmod 777 %s' % (REMOTE_MPI_SCRIPT_PATH, REMOTE_MPI_SCRIPT_PATH)
+    remote_mpi_script_path = os.path.join(REMOTE_PARALLAX_ROOT, 'mpi_run_%d.sh' % machine_id)
+    remote_cmd += ' \'cat > %s\' && chmod 777 %s' % (remote_mpi_script_path, remote_mpi_script_path)
     print(colored('\n$ %s' % remote_cmd, 'red'))
     proc = subprocess.Popen(args=remote_cmd, shell=True)
     proc.wait()
@@ -84,7 +85,7 @@ def _get_hybrid_cmd(workers, protocol, redirect_path, mpi_cmd_in_config):
               ' -mca orte_base_help_aggregate 0'\
               ' -x NCCL_DEBUG=INFO'
     arg_runop = '-x %s=%s' % (PARALLAX_RUN_OPTION, PARALLAX_RUN_HYBRID)
-    num_process = reduce(lambda s, x: s + len(x['gpus']), workers, 0)
+    num_process = reduce(lambda s, x: s + max(len(x['gpus']), 1), workers, 0)
     arg_np = '-np %d' % num_process
     arg_host = '-H %s' % get_cluster_str_for_hosts(workers, with_slots=True)
     arg_redir = '-output-filename %s' % os.path.join(redirect_path, 'worker') \
@@ -155,13 +156,9 @@ def get_tf_clusterspec_for_hybrid(resource_info):
         hosts = resource_info[job]
         tf_cluster_dict[job] = []
         for host in hosts:
-            if len(host['gpus']) == 0:
+            for i in range(max(len(host['gpus']), 1)):
                 tf_cluster_dict[job].append(
-                    '%s:%d' % (host['hostname'], host['port'][0]))
-            else:
-                for i in range(len(host['gpus'])):
-                    tf_cluster_dict[job].append(
-                        '%s:%d' % (host['hostname'], host['port'][i]))
+                    '%s:%d' % (host['hostname'], host['port'][i]))
     cluster_spec = tf.train.ClusterSpec(tf_cluster_dict)
     return cluster_spec
 
@@ -183,7 +180,7 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
     cluster_spec = get_tf_clusterspec_for_hybrid(config.resource_info)
     worker_id = 0
     for i in range(machine_id):
-      worker_id += len(config.resource_info['worker'][i]['gpus'])
+      worker_id += max(1, len(config.resource_info['worker'][i]['gpus']))
     worker_id += hvd.local_rank()
     server = tf.train.Server(cluster_spec, job_name='worker',
                              task_index=worker_id, protocol=config.communication_config.ps_config.protocol,

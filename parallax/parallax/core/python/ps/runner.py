@@ -200,7 +200,7 @@ def _get_worker_info():
 
 def parallax_run_ps(single_gpu_meta_graph_def, config):
     worker_id, num_workers = _get_worker_info()
-    num_replicas_per_worker = len(config.resource_info['worker'][worker_id]['gpus'])
+    num_replicas_per_worker = max(1, len(config.resource_info['worker'][worker_id]['gpus']))
 
     parallax_log.debug("Launching server on worker %d" % worker_id)
     cluster_spec = get_tf_clusterspec(config.resource_info)

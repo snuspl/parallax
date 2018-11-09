@@ -29,7 +29,7 @@ def graph_transform_ps(single_gpu_meta_graph_def,
     ps_device = '/job:ps' if 'ps' in cluster_info else '/job:worker/cpu:0'
     cluster_spec = get_tf_clusterspec(cluster_info)
     worker = cluster_info['worker'][worker_id]
-    num_gpus = len(worker['gpus'])
+    num_replicas_per_worker = max(1, len(worker['gpus']))
 
     parallax_log.debug(
         "Starting graph transformation for PS for worker %d" % worker_id)
@@ -53,7 +53,7 @@ def graph_transform_ps(single_gpu_meta_graph_def,
             cluster_spec=cluster_spec,
             config=config,
             op_library_path=op_library_path,
-            num_replicas_per_worker=num_gpus,
+            num_replicas_per_worker=num_replicas_per_worker,
             tensor_or_op_name_to_replica_names=tensor_or_op_name_to_replica_names)
     parallax_log.debug(
         "Finished graph transformation for PS for worker %d" % worker_id)
