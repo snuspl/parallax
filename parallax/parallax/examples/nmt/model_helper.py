@@ -83,7 +83,8 @@ def create_train_model(
     tgt_dataset = tf.data.TextLineDataset(tgt_file)
     skip_count_placeholder = tf.placeholder(shape=(), dtype=tf.int64)
 
-    iterator = iterator_utils.get_iterator(
+    with tf.device('CPU:0'):
+      iterator = iterator_utils.get_iterator(
         src_dataset,
         tgt_dataset,
         src_vocab_table,
@@ -140,7 +141,8 @@ def create_eval_model(model_creator, hparams, scope=None, extra_args=None):
     tgt_file_placeholder = tf.placeholder(shape=(), dtype=tf.string)
     src_dataset = tf.data.TextLineDataset(src_file_placeholder)
     tgt_dataset = tf.data.TextLineDataset(tgt_file_placeholder)
-    iterator = iterator_utils.get_iterator(
+    with tf.device('CPU:0'):
+      iterator = iterator_utils.get_iterator(
         src_dataset,
         tgt_dataset,
         src_vocab_table,

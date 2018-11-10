@@ -126,8 +126,7 @@ def _init_global_vars(sess):
             sess.run(c)
 
 
-def parallax_run_mpi(single_gpu_meta_graph_def, config,
-                     export_graph=True):
+def parallax_run_mpi(single_gpu_meta_graph_def, config):
 
     mpi_meta_graph_def, tensor_or_op_name_to_replica_names = \
         graph_transform_mpi(single_gpu_meta_graph_def, config)
@@ -137,8 +136,8 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config,
     with tf.Graph().as_default() as graph_to_run:
         parallax_log.debug("Importing MPI graph on worker %d" % worker_id)
         tf.train.import_meta_graph(mpi_meta_graph_def)
-        if export_graph:
-            export_mpi_meta_graph(worker_id)
+        if config.export_graph_path:
+            export_mpi_meta_graph(config.export_graph_path, worker_id)
 
         ckpt_hooks = build_ckpt_hooks(config.get_ckpt_config()) if worker_id == 0 else None
 

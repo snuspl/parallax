@@ -96,7 +96,8 @@ def _handle_collection_def(multi_gpu_meta_graph_def, op_names_to_replicate,
                              tf.GraphKeys.MOVING_AVERAGE_VARIABLES,
                              tf.GraphKeys.LOCAL_VARIABLES,
                              tf.GraphKeys.MODEL_VARIABLES,
-                             tf.GraphKeys.GRADIENTS_INFO]
+                             tf.GraphKeys.GRADIENTS_INFO,
+                             tf.GraphKeys.GLOBAL_STEP]
     keys_to_remove = []
     for key, col_def in multi_gpu_meta_graph_def.collection_def.items():
         kind = col_def.WhichOneof("kind")

@@ -29,6 +29,8 @@ from tensorflow.core.protobuf import gradients_info_pb2
 from tensorflow.core.protobuf import meta_graph_pb2
 from tensorflow.core.protobuf import queue_runner_pb2
 from tensorflow.core.protobuf import rewriter_config_pb2
+from tensorflow.python import pywrap_tensorflow as c_api
+from tensorflow.python.framework import c_api_util
 from tensorflow.python.framework import ops
 from tensorflow.python.grappler import tf_optimizer
 from tensorflow.python.ops import array_ops
@@ -91,7 +93,7 @@ DEQUEUE_OP_TYPES = [
     "QueueDequeue", "QueueDequeueV2",
     "QueueDequeueUpTo", "QueueDequeueUpToV2"]
 ITERATOR_OP_TYPES = [
-    "Iterator"
+    "Iterator", "IteratorV2"
 ]
 
 UPDATE_OP_VAR_POS = 0
@@ -134,13 +136,16 @@ def update_consumers(consumers, old_tensor, new_tensor):
             if x == old_tensor:
                 consumer_op._update_input(i, new_tensor)
 
-
 def update_control_consumers(control_consumer_ops, old_op, new_op):
     for control_consumer_op in control_consumer_ops:
-        control_consumer_op.control_inputs.remove(old_op)
-        control_consumer_op.control_inputs.append(new_op)
-        control_consumer_op._recompute_node_def()
-
+         control_inputs = list(control_consumer_op.control_inputs)
+         size = len(control_inputs)
+         control_inputs.remove(old_op)
+         assert size - 1 == len(control_inputs)
+         control_inputs.append(new_op)
+         assert size == len(control_inputs)
+         control_consumer_op._remove_all_control_inputs()
+         control_consumer_op._add_control_inputs(control_inputs)
 
 # Starting from start_ops, follow the computation graph from consumer to input
 # to find ancestors. Stop navigating the graph at end_ops. Include both
@@ -700,13 +705,19 @@ def replicate_variables_to_devices(meta_graph_def,
 def update_shard_values_for_worker(num_workers, worker_id):
     num_shards_per_worker = 1
     for num_shards in tf.get_collection(shard.NUM_SHARDS):
+        num_shards_tensor = num_shards.op.node_def.attr["value"].tensor
         num_shards_per_worker = \
-            num_shards.op.node_def.attr["value"].tensor.int64_val[0]
-        num_shards.op.node_def.attr["value"].tensor.int64_val[0] *= num_workers
+            num_shards_tensor.int64_val[0]
+        num_shards_tensor.int64_val[0] *= num_workers
+        num_shards.op._set_attr("value", attr_value_pb2.AttrValue(tensor=num_shards_tensor))
+        assert num_shards.op.node_def.attr["value"].tensor.int64_val[0] == num_shards_per_worker * num_workers
 
     for shard_id in tf.get_collection(shard.SHARD_ID):
-        shard_id.op.node_def.attr["value"].tensor.int64_val[0] += \
+        shard_id_tensor = shard_id.op.node_def.attr["value"].tensor
+        shard_id_tensor.int64_val[0] += \
             num_shards_per_worker * worker_id
+        shard_id.op._set_attr("value", attr_value_pb2.AttrValue(tensor=shard_id_tensor))
+        assert shard_id.op.node_def.attr["value"].tensor.int64_val[0] == shard_id_tensor.int64_val[0]
 
     # find and update dataset with shard filter predicate
     if len(tf.get_collection(shard.SHARD_FILTER_PRED)) > 0:
@@ -715,8 +726,8 @@ def update_shard_values_for_worker(num_workers, worker_id):
             if 'dataset_factory' not in op.node_def.attr:
                 continue
             func_name = op.node_def.attr['dataset_factory'].func.name
-            dataset_factory_func_def = \
-                tf.get_default_graph()._functions[func_name].definition
+            dataset_factory_func = tf.get_default_graph()._get_function(func_name)
+            dataset_factory_func_def = dataset_factory_func.definition
             node_name_to_node = {}
             for node in dataset_factory_func_def.node_def:
                 node_name_to_node[node.name] = node
@@ -737,8 +748,26 @@ def update_shard_values_for_worker(num_workers, worker_id):
                         num_workers
                     shard_id_node.attr['value'].tensor.int64_val[0] += \
                         num_shards_per_worker * worker_id
-                    break
+                    if dataset_factory_func._c_func:
+                        # update dataset factory name
+                        func_name = '%s_%d' % (func_name, shard_id_node.attr['value'].tensor.int64_val[0])
+                        dataset_factory_func._func_name = func_name
+                        dataset_factory_func_def.signature.name = func_name
 
+                        serialized = dataset_factory_func_def.SerializeToString()
+                        c_func = c_api.TF_FunctionImportFunctionDef(serialized)
+                        dataset_factory_func._c_func = \
+                            c_api_util.ScopedTFFunction(c_func)
+
+                        #TODO: remove old dataset factory function
+                        tf.get_default_graph()._add_function(dataset_factory_func)
+                        op_func = op.node_def.attr['dataset_factory'].func
+                        op_func.name = func_name
+                        op._set_attr('dataset_factory', 
+                                     attr_value_pb2.AttrValue(func=op_func))
+                        break
+
+            assert dataset_factory_func == tf.get_default_graph()._get_function(func_name)
 
 def _get_shared_name_to_stage_ops(ops):
     stage_ops = [op for op in ops if op.type in STAGE_OP_TYPES]

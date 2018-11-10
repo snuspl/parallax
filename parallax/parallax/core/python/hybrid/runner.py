@@ -201,9 +201,8 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
         parallax_log.debug("Importing MPI graph on worker %d" % worker_id)
 
         tf.train.import_meta_graph(meta_graph_def)
-        export_graph = True
-        if export_graph:
-            export_hybrid_meta_graph(worker_id)
+        if config.export_graph_path:
+            export_hybrid_meta_graph(config.export_graph_path, worker_id)
 
         ckpt_hooks = \
             build_ckpt_hooks(config.get_ckpt_config()) \
