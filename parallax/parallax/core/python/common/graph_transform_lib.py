@@ -527,7 +527,7 @@ def add_sync_op(worker_id,
                 # after executing variable update
                 token = tf.constant(False)
                 with tf.control_dependencies(var_update_deps):
-                   for i, q in enumerate(var_update_sync_queues):
+                    for i, q in enumerate(var_update_sync_queues):
                         if i != worker_id:
                             queue_ops.append(q.enqueue(token))
                         else:
