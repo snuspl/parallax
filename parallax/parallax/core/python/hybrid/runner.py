@@ -73,15 +73,17 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info, machine_
 
 def _prepare_workers(workers, driver_path, args, resource_info):
     unique_workers = {}
+    machines = []
     for worker in workers:
         hostname = worker['hostname']
         if hostname in unique_workers:
             unique_workers[hostname]['gpus'].extend(worker['gpus'])
         else:
+            machines.append(hostname)
             unique_workers[hostname] = worker
 
-    for i, worker in enumerate(unique_workers.values()):
-        _prepare_worker(worker, driver_path, args, resource_info, i)
+    for i, hostname in enumerate(machines):
+        _prepare_worker(unique_workers[hostname], driver_path, args, resource_info, i)
 
 
 def _prepare_worker(worker, driver_path, args, resource_info, machine_id):
@@ -190,10 +192,16 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
     if gpus:
         sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
     cluster_spec = get_tf_clusterspec_for_hybrid(config.resource_info)
+    machine_to_ids = {}
+    for w in config.resource_info['worker']:
+      if w['hostname'] not in machine_to_ids:
+          machine_to_ids[w['hostname']] = len(machine_to_ids)
     worker_id = 0
-    for i in range(machine_id):
-      worker_id += max(1, len(config.resource_info['worker'][i]['gpus']))
+    for w in config.resource_info['worker']:
+        if machine_to_ids[w['hostname']] < machine_id:
+            worker_id += max(1, len(w['gpus']))
     worker_id += hvd.local_rank()
+    print(worker_id)
     server = tf.train.Server(cluster_spec, job_name='worker',
                              task_index=worker_id, protocol=config.communication_config.ps_config.protocol,
                              config=sess_config)

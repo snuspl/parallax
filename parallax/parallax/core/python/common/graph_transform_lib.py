@@ -1567,6 +1567,7 @@ def add_aggregate_gradients_ops_only_between(multi_gpu_meta_graph_def,
 def add_sync_op_only_between(worker_id,
                              local_worker_id,
                              machine_id,
+                             num_total_workers,
                              num_local_workers,
                              num_worker_machines,
                              master_var_op_to_mirror_vars,
@@ -1595,7 +1596,7 @@ def add_sync_op_only_between(worker_id,
 
     def _get_accum_apply_and_agg_grad(var, grad, indices, dense_shape):
         var_op = var.op
-        num_required = num_worker_machines if local_aggregation else num_worker_machines * num_local_workers
+        num_required = num_worker_machines if local_aggregation else num_total_workers
         if indices is None:
             assert False # hybrid does not use this function
             grad_accum = tf.ConditionalAccumulator(
@@ -1682,7 +1683,7 @@ def add_sync_op_only_between(worker_id,
                               shared_name='auto_parallel_%s'
                                           '_update_sync_queue_%d'
                                           % (global_grad_values.name, i))
-                        for i in range(num_worker_machines * num_local_workers)]
+                        for i in range(num_total_workers)]
                 token = tf.constant(False)
                 queue_ops = []
                 if worker_id == 0:

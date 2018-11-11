@@ -102,7 +102,7 @@ def _get_available_gpus(hostname):
     try:
         result = subprocess.check_output('ssh %s ls /proc/driver/nvidia/gpus' % hostname, shell=True)
         result = list(range(len(result.strip().split('\n')))) # FOR TEST
-        return []
+        return result
     except subprocess.CalledProcessError:
         return []
 

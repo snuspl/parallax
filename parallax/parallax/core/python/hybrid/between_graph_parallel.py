@@ -16,6 +16,7 @@
 import sys
 import time
 
+import horovod.tensorflow as hvd
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.training.python.training import device_setter
@@ -131,6 +132,7 @@ def between_graph_auto_parallel_compute(meta_graph_def,
                 var_op_to_agg_grad, trainable_var_op_to_update_op =\
                     add_sync_op_only_between(
                         worker_id, local_worker_id, machine_id,
+                        hvd.size(),
                         num_local_workers, num_worker_machines,
                         master_var_op_to_mirror_vars,
                         ps_device, worker_device,
