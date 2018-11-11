@@ -23,6 +23,7 @@ import os
 from functools import reduce
 
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 import horovod.tensorflow as hvd
 
 from parallax.core.python.common.lib import *
@@ -63,15 +64,23 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info, machine_
 
     remote_cmd = 'echo \'%s\' | ' % mpi_script
     remote_cmd += 'ssh -p %d %s' % (port, hostname)
-    remote_mpi_script_path = os.path.join(REMOTE_PARALLAX_ROOT, 'mpi_run_%d.sh' % machine_id)
-    remote_cmd += ' \'cat > %s\' && chmod 777 %s' % (remote_mpi_script_path, remote_mpi_script_path)
+    remote_cmd += ' \'cat > %s\' && chmod 777 %s' % (REMOTE_MPI_SCRIPT_PATH,
+                                                     REMOTE_MPI_SCRIPT_PATH)
     print(colored('\n$ %s' % remote_cmd, 'red'))
     proc = subprocess.Popen(args=remote_cmd, shell=True)
     proc.wait()
 
 
 def _prepare_workers(workers, driver_path, args, resource_info):
-    for i, worker in enumerate(workers):
+    unique_workers = {}
+    for worker in workers:
+        hostname = worker['hostname']
+        if hostname in unique_workers:
+            unique_workers[hostname]['gpus'].extend(worker['gpus'])
+        else:
+            unique_workers[hostname] = worker
+
+    for i, worker in enumerate(unique_workers.values()):
         _prepare_worker(worker, driver_path, args, resource_info, i)
 
 
@@ -176,7 +185,10 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
     sess_config = config.sess_config
     if sess_config is None:
         sess_config = tf.ConfigProto(allow_soft_placement=True)
-    sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
+    local_device_protos = device_lib.list_local_devices()
+    gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
+    if gpus:
+        sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
     cluster_spec = get_tf_clusterspec_for_hybrid(config.resource_info)
     worker_id = 0
     for i in range(machine_id):

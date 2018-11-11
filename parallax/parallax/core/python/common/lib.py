@@ -181,7 +181,7 @@ def deserialize_resource_info(resource_info_serialized):
 def get_cluster_str_for_hosts(hosts, with_slots):
     if with_slots:
         return ','.join(
-            map(lambda host: '%s:%d' % (host['hostname'], len(host['gpus'])),
+            map(lambda host: '%s:%d' % (host['hostname'], max(1, len(host['gpus']))),
                 hosts))
     else:
         host_list = []

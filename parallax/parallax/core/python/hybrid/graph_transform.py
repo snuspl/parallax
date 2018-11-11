@@ -285,11 +285,21 @@ def graph_transform_hybrid(single_gpu_meta_graph_def,
                            config):
     cluster_info = config.resource_info
     this_worker = None
-    for w in cluster_info['worker']:
-        if w['hostname'] == hostname:
-            this_worker = w
-    num_worker_machines = len(cluster_info['worker'])
-    num_local_workers = max(len(this_worker['gpus']), 1)
+    unique_workers = {}
+    num_workers = {}
+    for worker in cluster_info['worker']:
+        h = worker['hostname']
+        if h in unique_workers:
+            unique_workers[h]['gpus'].extend(worker['gpus'])
+            num_workers[h] += 1
+        else:
+            unique_workers[h] = worker
+            num_workers[h] = 1
+        if h == hostname:
+            this_worker = worker
+    
+    num_worker_machines = len(unique_workers.values())
+    num_local_workers = num_workers[hostname]
     ps_device = '/job:ps' if 'ps' in cluster_info else '/job:worker/cpu:0'
     ps_job_name = tf.DeviceSpec.from_string(ps_device).job
     cluster_spec = get_tf_clusterspec(cluster_info).as_dict()

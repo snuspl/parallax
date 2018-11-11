@@ -39,7 +39,7 @@ def graph_transform_ps(single_gpu_meta_graph_def,
 
     multi_gpu_meta_graph_def = \
         in_graph_auto_parallel_compute(
-            single_gpu_meta_graph_def, num_gpus, config=config,
+            single_gpu_meta_graph_def, num_replicas_per_worker, config=config,
             op_library_path=op_library_path,
             tensor_or_op_name_to_replica_names=tensor_or_op_name_to_replica_names)
 
