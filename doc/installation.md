@@ -20,7 +20,7 @@ $ source parallax_venv/bin/activate
 ```
 
 ## Install TensorFlow
-TensorFlow requires [Bazel](https://docs.bazel.build/versions/master/install.html) to build a binary file. (See [TF install](https://www.tensorflow.org/install/install_sources) for more instructions on how to build TensorFlow from source.) TensorFlow can be built CPU-only but Parallax needs TensorFlow with GPU support using [CUDA Toolkit 9.0](https://developer.nvidia.com/cuda-zone) and [CuDNN SDK v7](https://developer.nvidia.com/cudnn). To install TensorFlow with GPU support, follow the commands below.
+TensorFlow requires [Bazel](https://docs.bazel.build/versions/master/install.html) to build a binary file. (See [TF install](https://www.tensorflow.org/install/install_sources) for more instructions on how to build TensorFlow from source.) TensorFlow can be built CPU-only but Parallax needs TensorFlow with GPU support using [CUDA Toolkit 9.0 or 10.0](https://developer.nvidia.com/cuda-zone) and [CuDNN SDK v7](https://developer.nvidia.com/cudnn). To install TensorFlow with GPU support, follow the commands below.
 
 ```shell
 $ cd parallax/tensorflow
