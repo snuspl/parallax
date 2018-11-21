@@ -24,7 +24,7 @@ TensorFlow requires [Bazel](https://docs.bazel.build/versions/master/install.htm
 
 ```shell
 $ cd parallax/tensorflow
-$ git checkout r1.11 (for TensorFlow v1.11)
+$ git checkout r1.11 (optional for TensorFlow v1.11)
 $ pip install numpy
 $ ./configure
   (Configurations related to cuda should be turned on to use GPUs)
