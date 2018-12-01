@@ -199,8 +199,18 @@ def _get_worker_info():
 
 
 def parallax_run_ps(single_gpu_meta_graph_def, config):
+    create_profile_directory(config.profile_config.profile_dir, 
+                             config.resource_info, False)
     worker_id, num_workers = _get_worker_info()
-    num_replicas_per_worker = len(config.resource_info['worker'][worker_id]['gpus'])
+    worker = config.resource_info['worker'][worker_id]
+    num_replicas_per_worker = len(worker['gpus'])
+    if config.profile_config.profile_dir:
+        for ps_i, ps in enumerate(config.resource_info['ps']):
+            if ps['hostname'] == worker['hostname']:
+                append_task_info(config.profile_config.profile_dir,
+                                 worker['hostname'], 
+                                 ['worker:%d'%worker_id, 'ps:%d'%ps_i])
+                break
 
     parallax_log.debug("Launching server on worker %d" % worker_id)
     cluster_spec = get_tf_clusterspec(config.resource_info)
@@ -218,7 +228,14 @@ def parallax_run_ps(single_gpu_meta_graph_def, config):
         parallax_log.debug("Importing PS graph on worker %d" % worker_id)
         tf.train.import_meta_graph(ps_meta_graph_def)
         if config.export_graph_path:
-            export_ps_meta_graph(config.export_graph_path, worker_id)
+            export_meta_graph(config.export_graph_path, worker_id)
+        if config.profile_config.profile_dir:
+            path = os.path.join(config.profile_config.profile_dir, worker['hostname'],
+                                'worker:%d'%worker_id)
+            export_meta_graph(path, worker_id)
+            config.profile_config.profile_dir = \
+                os.path.join(config.profile_config.profile_dir, worker['hostname'],
+                             'worker:%d'%worker_id, 'run_meta')
 
         replicated_var_init_op = None
         try:
@@ -259,6 +276,7 @@ def parallax_run_ps(single_gpu_meta_graph_def, config):
         sess_context = ParallaxSessionContext(step,
                                               config.profile_config.profile_dir,
                                               config.profile_config.profile_steps,
+                                              config.profile_config.profile_range,
                                               tensor_or_op_name_to_replica_names,
                                               num_replicas_per_worker)
         sess_context.set_parallax_session_context()

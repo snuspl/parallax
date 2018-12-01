@@ -167,13 +167,14 @@ def get_tf_clusterspec_for_hybrid(resource_info):
 
 def parallax_run_hybrid(single_gpu_meta_graph_def,
                         config):
-
     # Initialize horovod
     hvd.init()
     #worker_id = hvd.rank()
     local_worker_id = hvd.local_rank()
-    num_workers = hvd.size()
 
+    num_workers = hvd.size()
+    create_profile_directory(config.profile_config.profile_dir,
+                             config.resource_info, True)
     machine_id, hostname = _get_worker_info()
 
     sess_config = config.sess_config
@@ -185,6 +186,17 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
     for i in range(machine_id):
       worker_id += len(config.resource_info['worker'][i]['gpus'])
     worker_id += hvd.local_rank()
+    if config.profile_config.profile_dir:
+        for ps_i, ps in enumerate(config.resource_info['ps']):
+            if ps['hostname'] == hostname:
+                if local_worker_id == 0:
+                    tasks = ['ps:%d'%ps_i, 'worker:%d'%worker_id]
+                else:
+                    tasks = ['worker:%d'%worker_id]
+                append_task_info(config.profile_config.profile_dir,
+                                 hostname, 
+                                 tasks)
+                break
     server = tf.train.Server(cluster_spec, job_name='worker',
                              task_index=worker_id, protocol=config.communication_config.ps_config.protocol,
                              config=sess_config)
@@ -202,8 +214,20 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
 
         tf.train.import_meta_graph(meta_graph_def)
         if config.export_graph_path:
-            export_hybrid_meta_graph(config.export_graph_path, worker_id)
+            export_meta_graph(config.export_graph_path, worker_id)
+        if config.profile_config.profile_dir:
+            path = os.path.join(config.profile_config.profile_dir, hostname,
+                                'worker:%d'%worker_id)
+            export_meta_graph(path, worker_id)
 
+            if local_worker_id != 0:
+                #Only one CUPTI profiler can run in a machine
+                #See tensorflow/tensorflow/core/platform/default/device_tracer.cc:L452
+                config.profile_config.profile_dir = None
+            else:
+                config.profile_config.profile_dir = \
+                    os.path.join(config.profile_config.profile_dir, hostname,
+                                 'worker:%d'%worker_id, 'run_meta')
         ckpt_hooks = \
             build_ckpt_hooks(config.get_ckpt_config()) \
             if worker_id == 0 else None
@@ -232,6 +256,7 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
             ParallaxSessionContext(step,
                                    config.profile_config.profile_dir,
                                    config.profile_config.profile_steps,
+                                   config.profile_config.profile_range,
                                    tensor_or_op_name_to_replica_names,
                                    1)
         sess_context.set_parallax_session_context()
