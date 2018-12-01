@@ -254,8 +254,6 @@ def get_average_execution_time(master, num_workers):
             "socket connection is broken")      
     return total_exec_time / num_workers
 
-
- 
 def export_meta_graph(export_dir, worker_id):
     export_meta_graph_path = \
         os.path.join(export_dir,

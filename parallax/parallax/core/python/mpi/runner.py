@@ -131,6 +131,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config):
     create_profile_directory(config.profile_config.profile_dir,
                              config.resource_info, True)
     hostname = os.getenv(PARALLAX_HOSTNAME, 0)
+
     mpi_meta_graph_def, tensor_or_op_name_to_replica_names = \
         graph_transform_mpi(single_gpu_meta_graph_def, config)
     worker_id = hvd.rank()

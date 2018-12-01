@@ -1,7 +1,7 @@
 # Parallax
 **Parallax** is a tool that automatically parallelizes training of a single-GPU deep learning model correctly and efficiently in distributed multi-GPU environments. Parallax correctly handles complicated auto-parallelization issues; in addition, it also leverages various optimizations to minimize communication overhead incurred by distributed training. If you are interested, you can find the technical details of Parallax in [our arxiv paper](https://arxiv.org/pdf/1808.02621.pdf).
 
-Parallax is currently implemented on [TensorFlow v1.6](https://github.com/tensorflow/tensorflow/tree/r1.6). In case that Parallax uses Message Passing Interface (MPI), Parallax requires *AllReduce*, *AllGather* operations implemented in [Horovod v0.11.2](https://github.com/uber/horovod/tree/v0.11.2). We plan to support multiple TensorFlow versions. 
+Parallax is currently implemented on [TensorFlow v1.6](https://github.com/tensorflow/tensorflow/tree/r1.6) and [TensorFlow v1.11](https://github.com/tensorflow/tensorflow/tree/r1.11). In case that Parallax uses Message Passing Interface (MPI), Parallax requires *AllReduce*, *AllGather* operations implemented in [Horovod v0.11.2](https://github.com/uber/horovod/tree/v0.11.2). We plan to support multiple TensorFlow versions. 
 
 * [Installation](doc/installation.md)
 * [Running Parallax](doc/quick_start.md)

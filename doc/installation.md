@@ -1,6 +1,6 @@
 # Installation
 Parallax runs under Linux with Python 2.7; we haven't yet tested Parallax on other platforms and 3.3+.
-Parallax depends on a modified version of TensorFlow 1.6 and horovod 0.11.2 in parallax repository as submodules. *Each of these frameworks needs to be built and installed from source, which is explained in further detail below*. Parallax itself also requires installing from sources, and below explains the installation process step by step. We plan to provide binary files in the near future.
+Parallax depends on a modified version of TensorFlow 1.6/1.11 and horovod 0.11.2 in parallax repository as submodules. *Each of these frameworks needs to be built and installed from source, which is explained in further detail below*. Parallax itself also requires installing from sources, and below explains the installation process step by step. We plan to provide binary files in the near future.
 
 First, clone the parallax repository on your linux machine:
 ```shell
@@ -20,10 +20,11 @@ $ source parallax_venv/bin/activate
 ```
 
 ## Install TensorFlow
-TensorFlow requires [Bazel](https://docs.bazel.build/versions/master/install.html) to build a binary file. (See [TF install](https://www.tensorflow.org/install/install_sources) for more instructions on how to build TensorFlow from source.) TensorFlow can be built CPU-only but Parallax needs TensorFlow with GPU support using [CUDA Toolkit 9.0](https://developer.nvidia.com/cuda-zone) and [CuDNN SDK v7](https://developer.nvidia.com/cudnn). To install TensorFlow with GPU support, follow the commands below.
+TensorFlow requires [Bazel](https://docs.bazel.build/versions/master/install.html) to build a binary file. (See [TF install](https://www.tensorflow.org/install/install_sources) for more instructions on how to build TensorFlow from source.) TensorFlow can be built CPU-only but Parallax needs TensorFlow with GPU support using [CUDA Toolkit 9.0 or 10.0](https://developer.nvidia.com/cuda-zone) and [CuDNN SDK v7](https://developer.nvidia.com/cudnn). To install TensorFlow with GPU support, follow the commands below.
 
 ```shell
 $ cd parallax/tensorflow
+$ git checkout r1.11 (optional for TensorFlow v1.11)
 $ pip install numpy
 $ ./configure
   (Configurations related to cuda should be turned on to use GPUs)
@@ -35,10 +36,9 @@ $ pip install {target_directory}/tensorflow-*.whl
 ```
 
 
-
 ## Install Horovod
 To install horovod, [Open MPI](https://www.open-mpi.org/faq/?category=building#easy-build) and [NCCL](https://docs.nvidia.com/deeplearning/sdk/nccl-install-guide/index.html) are required as MPI implementations. To install OpenMPI, `--with-cuda` flag should be in the configure line, and you can also add `--with-verbs` to use ibverbs.
-We tested on openmpi-3.0.0 and NCCL 2.1.15.
+We tested on openmpi-3.0.0, NCCL 2.1.15(for cuda9.0) and NCCL 2.3.5(for cuda10.0).
 ```shell
 $ cd ../horovod
 $ python setup.py sdist
