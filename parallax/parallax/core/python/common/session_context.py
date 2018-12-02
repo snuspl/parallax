@@ -36,14 +36,15 @@ def _parallax_run(self,
     feed_dict = self.parallax_session_context._convert_feed(feed_dict)
 
     if (self.parallax_session_context._profile_dir is None 
-        or self.parallax_session_context._profile_steps is None):
+        or (self.parallax_session_context._profile_steps is None \
+            and self.parallax_session_context._profile_range is None)):
         return self._run_internal(fetches, feed_dict)
 
     with self.parallax_session_context._new_step() as state:
         step, locked = state
         if locked and self.parallax_session_context._is_profile_step(step):
             if not run_metadata:
-                run_metadata = tf.RunMetadata()
+                run_metadata = self.parallax_session_context._run_metadata()
             if not options:
                 options = tf.RunOptions(
                     trace_level=tf.RunOptions.FULL_TRACE)
@@ -51,7 +52,6 @@ def _parallax_run(self,
             else:
                 old_trace_level = options.trace_level
                 options.trace_level = tf.RunOptions.FULL_TRACE
-                
             ret = self._run_internal(
                 fetches, feed_dict, options, run_metadata)
             self.parallax_session_context._dump_profile(
@@ -72,6 +72,7 @@ class ParallaxSessionContext(object):
                  step,
                  profile_dir,
                  profile_steps,
+                 profile_range,
                  replica_dict,
                  num_replicas_per_worker):
         """Constructs an `ParallaxSessionContext` instance.
@@ -79,6 +80,7 @@ class ParallaxSessionContext(object):
         Args:
           profile_dir: Directory to store profiles.
           profile_steps: A list of steps for tracing and saving as a file.
+          profile_range : A tuple of tracing start and end step.
           replica_dict : A dictionary to map old tensor(operation) name
             to new tensor(operation) names.
           num_replicas_per_worker : Number of replicas per worker.
@@ -87,8 +89,11 @@ class ParallaxSessionContext(object):
         self._step = step
         self._profile_dir = profile_dir
         self._profile_steps = profile_steps
+        self._profile_range = profile_range
+        assert self._profile_steps is None or self._profile_range is None
         self._replica_dict = replica_dict
         self._num_replicas_per_worker = num_replicas_per_worker
+        self._run_metadata = None
 
         for key, values in self._replica_dict.items():
             if len(values) == 1:
@@ -106,15 +111,24 @@ class ParallaxSessionContext(object):
             self._lock.release()
  
     def _is_profile_step(self, step):
-      if step in self._profile_steps:
-        return True
+      if self._profile_steps and step in self._profile_steps:
+          return True
+      elif self._profile_range and \
+          (step >= self._profile_range[0] and step < self._profile_range[1]):
+          return True
       return False
+
+    def _run_metadata(self):
+      if not self._run_metadata:
+          self._run_metadata = tf.RunMetadata()
+      return self._run_metadata
 
     def _dump_profile(self, metadata, basename):
       if not tf.gfile.Exists(self._profile_dir):
           tf.gfile.MakeDirs(self._profile_dir)
       with tf.gfile.Open(os.path.join(self._profile_dir, basename), 'wb') as f:
           f.write(metadata.SerializeToString())
+      self._run_metadata = None
 
     def _read_converted_names(self, target):
         if isinstance(target, compat.bytes_or_text_types):

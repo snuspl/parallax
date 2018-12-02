@@ -47,7 +47,8 @@ def create_mpi_script(driver_path, args, hostname, gpus, port=22):
         parallax_log_level = logging.INFO
     env = {
         "CUDA_VISIBLE_DEVICES": ','.join(str(gpuid) for gpuid in gpus),
-        "PARALLAX_LOG_LEVEL": parallax_log_level
+        "PARALLAX_LOG_LEVEL": parallax_log_level,
+        PARALLAX_HOSTNAME: hostname,
     }
 
     cmd_env = ' '.join(
@@ -127,18 +128,42 @@ def _init_global_vars(sess):
 
 
 def parallax_run_mpi(single_gpu_meta_graph_def, config):
+    hostname = os.getenv(PARALLAX_HOSTNAME, 0)
+    create_profile_directory(config.profile_config.profile_dir,
+                             config.profile_config.profile_worker,
+                             config.resource_info, hostname)
 
     mpi_meta_graph_def, tensor_or_op_name_to_replica_names = \
         graph_transform_mpi(single_gpu_meta_graph_def, config)
     worker_id = hvd.rank()
     num_workers = hvd.size()
+        
+    if config.profile_config.profile_dir:
+        append_task_info(config.profile_config.profile_dir,
+                         hostname,
+                         ['worker:%d'%worker_id])
 
     with tf.Graph().as_default() as graph_to_run:
         parallax_log.debug("Importing MPI graph on worker %d" % worker_id)
         tf.train.import_meta_graph(mpi_meta_graph_def)
-        if config.export_graph_path:
-            export_mpi_meta_graph(config.export_graph_path, worker_id)
 
+        if config.export_graph_path:
+            export_meta_graph(config.export_graph_path, worker_id)
+
+        if config.profile_config.profile_dir:
+            path = os.path.join(config.profile_config.profile_dir, hostname,
+                                'worker:%d'%worker_id)
+            export_meta_graph(path, worker_id)
+            
+            if worker_id != config.profile_config.profile_worker:
+                #Only one CUPTI profiler can run in a machine
+                #See tensorflow/tensorflow/core/platform/default/device_tracer.cc:L452
+                config.profile_config.profile_dir = None
+            else:
+                config.profile_config.profile_dir = \
+                    os.path.join(config.profile_config.profile_dir, hostname,
+                                 'worker:%d'%worker_id, 'run_meta')      
+ 
         ckpt_hooks = build_ckpt_hooks(config.get_ckpt_config()) if worker_id == 0 else None
 
         sess_config = config.sess_config
@@ -167,6 +192,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config):
             ParallaxSessionContext(step,
                                    config.profile_config.profile_dir,
                                    config.profile_config.profile_steps,
+                                   config.profile_config.profile_range,
                                    tensor_or_op_name_to_replica_names,
                                    1)
         sess_context.set_parallax_session_context()

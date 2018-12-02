@@ -82,12 +82,12 @@ def main(_):
     start = time.time()
     for i in range(FLAGS.max_steps):
         results = sess.run(fetches)
-        if i % FLAGS.log_frequency == 0:
+        if (i + 1) % FLAGS.log_frequency == 0:
             end = time.time()
             throughput = float(FLAGS.log_frequency) / float(end - start)
             parallax.log.info(
                 "global step: %d, loss: %f, throughput: %f steps/sec"
-                % (results['global_step'][0], results['cost'][0], throughput))
+                % (results['global_step'][0]+1, results['cost'][0], throughput))
             start = time.time()
 
 if __name__ == '__main__':
