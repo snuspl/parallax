@@ -343,7 +343,7 @@ def create_profile_directory(profile_dir, profile_worker,
         host_dir = os.path.join(profile_dir, w['hostname'])
         if not tf.gfile.Exists(host_dir):
             tf.gfile.MakeDirs(host_dir)
-        w_dir = os.path.join(host_dir, 'worker:%d' % profile_worker)
+        w_dir = os.path.join(host_dir, 'worker:%d' % w_i)
         if not tf.gfile.Exists(w_dir):
             tf.gfile.MakeDirs(w_dir)
 
