@@ -199,10 +199,12 @@ def _get_worker_info():
 
 
 def parallax_run_ps(single_gpu_meta_graph_def, config):
-    create_profile_directory(config.profile_config.profile_dir, 
-                             config.resource_info, False)
     worker_id, num_workers = _get_worker_info()
     worker = config.resource_info['worker'][worker_id]
+
+    create_profile_directory(config.profile_config.profile_dir, 
+                             config.profile_config.profile_worker,
+                             config.resource_info, worker['hostname'])
     num_replicas_per_worker = len(worker['gpus'])
     if config.profile_config.profile_dir:
         for ps_i, ps in enumerate(config.resource_info['ps']):
@@ -211,6 +213,9 @@ def parallax_run_ps(single_gpu_meta_graph_def, config):
                                  worker['hostname'], 
                                  ['worker:%d'%worker_id, 'ps:%d'%ps_i])
                 break
+         
+        if worker_id != config.profile_config.profile_worker:
+            config.profile_config.profile_dir = None
 
     parallax_log.debug("Launching server on worker %d" % worker_id)
     cluster_spec = get_tf_clusterspec(config.resource_info)

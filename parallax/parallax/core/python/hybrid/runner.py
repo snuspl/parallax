@@ -173,9 +173,10 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
     local_worker_id = hvd.local_rank()
 
     num_workers = hvd.size()
-    create_profile_directory(config.profile_config.profile_dir,
-                             config.resource_info, True)
     machine_id, hostname = _get_worker_info()
+    create_profile_directory(config.profile_config.profile_dir,
+                             config.profile_config.profile_worker,
+                             config.resource_info, hostname)
 
     sess_config = config.sess_config
     if sess_config is None:
@@ -220,7 +221,7 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
                                 'worker:%d'%worker_id)
             export_meta_graph(path, worker_id)
 
-            if local_worker_id != 0:
+            if worker_id != config.profile_config.profile_worker:
                 #Only one CUPTI profiler can run in a machine
                 #See tensorflow/tensorflow/core/platform/default/device_tracer.cc:L452
                 config.profile_config.profile_dir = None

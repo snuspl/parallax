@@ -329,7 +329,8 @@ class TensorOrOpNameToReplicaNames(object):
     def export(self):
         return self._mapping
 
-def create_profile_directory(profile_dir, resource_info, worker_per_gpu):
+def create_profile_directory(profile_dir, profile_worker, 
+                             resource_info, hostname):
     if not profile_dir:
       return
 
@@ -337,25 +338,18 @@ def create_profile_directory(profile_dir, resource_info, worker_per_gpu):
         tf.gfile.MakeDirs(profile_dir)
 
     for w_i, w in enumerate(resource_info['worker']):
+        if w['hostname'] != hostname:
+            continue
         host_dir = os.path.join(profile_dir, w['hostname'])
         if not tf.gfile.Exists(host_dir):
             tf.gfile.MakeDirs(host_dir)
-        if worker_per_gpu:
-            for i in range(max(1, len(w['gpus']))):
-                w_dir = os.path.join(host_dir, 'worker:%d' % i)
-                if not tf.gfile.Exists(w_dir):
-                    tf.gfile.MakeDirs(w_dir)
+        w_dir = os.path.join(host_dir, 'worker:%d' % profile_worker)
+        if not tf.gfile.Exists(w_dir):
+            tf.gfile.MakeDirs(w_dir)
 
-                run_meta_dir = os.path.join(w_dir, 'run_meta')
-                if not tf.gfile.Exists(run_meta_dir):
-                    tf.gfile.MakeDirs(run_meta_dir)
-        else:
-            w_dir = os.path.join(host_dir, 'worker:%d' % w_i)
-            if not tf.gfile.Exists(w_dir):
-                tf.gfile.MakeDirs(w_dir)
-            run_meta_dir = os.path.join(w_dir, 'run_meta')
-            if not tf.gfile.Exists(run_meta_dir):
-                tf.gfile.MakeDirs(run_meta_dir)
+        run_meta_dir = os.path.join(w_dir, 'run_meta')
+        if not tf.gfile.Exists(run_meta_dir):
+            tf.gfile.MakeDirs(run_meta_dir)
 
 def append_task_info(profile_dir, hostname, tasks):
     task_info = os.path.join(profile_dir, hostname, 'task_info')
