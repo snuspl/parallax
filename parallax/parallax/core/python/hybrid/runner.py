@@ -188,7 +188,8 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
     if sess_config is None:
         sess_config = tf.ConfigProto(allow_soft_placement=True)
     local_device_protos = device_lib.list_local_devices()
-    gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
+    # gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
+    gpus = []
     if gpus:
         sess_config.gpu_options.visible_device_list = str(hvd.local_rank())
     cluster_spec = get_tf_clusterspec_for_hybrid(config.resource_info)
