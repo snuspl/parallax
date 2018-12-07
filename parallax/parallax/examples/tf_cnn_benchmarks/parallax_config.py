@@ -32,6 +32,8 @@ flags.DEFINE_integer('save_n_ckpts_per_epoch', -1, """Save n checkpoints per eve
 flags.DEFINE_string('ckpt_dir', None, """Directory to save checkpoints""")
 flags.DEFINE_string('profile_dir', None, """Directory to save RunMetadata""")
 flags.DEFINE_string('profile_steps', None, """Comma separated porfile steps""")
+flags.DEFINE_string('profile_range', None, """profile_start_step,profile_end_step""")
+flags.DEFINE_integer('profile_worker', 0, """The worker to profile""")
 flags.DEFINE_boolean('local_aggregation', True,
                      """Whether to use local aggregation or not""")
 flags.DEFINE_boolean('boundary_among_servers', True,
@@ -69,12 +71,22 @@ def build_config():
     mpi_config = parallax.MPIConfig(use_allgatherv=FLAGS.use_allgatherv,
                                     mpirun_options=FLAGS.mpirun_options)
     def get_profile_steps():
-        if not FLAGS.profile_steps:
-            return []
-        FLAGS.profile_steps = FLAGS.profile_steps.strip()
-        return [int(step) for step in FLAGS.profile_steps.split(',')]
+        if FLAGS.profile_steps:
+            FLAGS.profile_steps = FLAGS.profile_steps.strip()
+            return [int(step) for step in FLAGS.profile_steps.split(',')]
+        return None
+    
+    def get_profile_range():
+        if FLAGS.profile_range:
+            FLAGS.profile_range = FLAGS.profile_range.strip()
+            splits = FLAGS.profile_range.split(',')
+            return (int(splits[0]), int(splits[1]))
+        return None
+        
     profile_config = parallax.ProfileConfig(profile_dir=FLAGS.profile_dir,
-                                            profile_steps=get_profile_steps())
+                                            profile_steps=get_profile_steps(),
+                                            profile_range=get_profile_range(),
+                                            profile_worker=FLAGS.profile_worker)
 
     parallax_config = parallax.Config()
     parallax_config.run_option = FLAGS.run_option
