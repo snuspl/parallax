@@ -127,6 +127,7 @@ class BaseModel(object):
 
     self.global_step = tf.train.get_or_create_global_step()
     params = tf.trainable_variables()
+    self.params = params
 
     # Gradients and SGD update operation for training the model.
     # Arrage for the embedding vars to appear at the beginning.
@@ -143,12 +144,14 @@ class BaseModel(object):
         tf.summary.scalar("lr", self.learning_rate)
       elif hparams.optimizer == "adam":
         opt = tf.train.AdamOptimizer(self.learning_rate)
+      self.optimizer = opt
 
       # Gradients
       gradients = tf.gradients(
           self.train_loss,
           params,
           colocate_gradients_with_ops=hparams.colocate_gradients_with_ops)
+      self.gradients = gradients
 
       clipped_grads, grad_norm_summary, grad_norm = model_helper.gradient_clip(
           gradients, max_gradient_norm=hparams.max_gradient_norm)

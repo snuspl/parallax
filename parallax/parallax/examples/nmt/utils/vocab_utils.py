@@ -34,22 +34,23 @@ EOS = "</s>"
 UNK_ID = 0
 
 
-def load_vocab(vocab_file):
+def load_vocab(vocab_file, vocab_size_limit=None):
   vocab = []
   with codecs.getreader("utf-8")(tf.gfile.GFile(vocab_file, "rb")) as f:
     vocab_size = 0
     for word in f:
+      if vocab_size_limit is not None and vocab_size == vocab_size_limit:
+        break
       vocab_size += 1
       vocab.append(word.strip())
   return vocab, vocab_size
 
-
 def check_vocab(vocab_file, out_dir, check_special_token=True, sos=None,
-                eos=None, unk=None):
+                eos=None, unk=None, vocab_size_limit=None):
   """Check if vocab_file doesn't exist, create from corpus_file."""
   if tf.gfile.Exists(vocab_file):
     utils.print_out("# Vocab file %s exists" % vocab_file)
-    vocab, vocab_size = load_vocab(vocab_file)
+    vocab, vocab_size = load_vocab(vocab_file, vocab_size_limit)
     if check_special_token:
       # Verify if the vocab starts with unk, sos, eos
       # If not, prepend those tokens & generate a new vocab file
@@ -75,16 +76,15 @@ def check_vocab(vocab_file, out_dir, check_special_token=True, sos=None,
   vocab_size = len(vocab)
   return vocab_size, vocab_file
 
-
-def create_vocab_tables(src_vocab_file, tgt_vocab_file, share_vocab):
+def create_vocab_tables(src_vocab_file, tgt_vocab_file, share_vocab, vocab_size_limit=None):
   """Creates vocab tables for src_vocab_file and tgt_vocab_file."""
   src_vocab_table = lookup_ops.index_table_from_file(
-      src_vocab_file, default_value=UNK_ID)
+      src_vocab_file, default_value=UNK_ID, vocab_size=vocab_size_limit)
   if share_vocab:
     tgt_vocab_table = src_vocab_table
   else:
     tgt_vocab_table = lookup_ops.index_table_from_file(
-        tgt_vocab_file, default_value=UNK_ID)
+        tgt_vocab_file, default_value=UNK_ID, vocab_size=vocab_size_limit)
   return src_vocab_table, tgt_vocab_table
 
 

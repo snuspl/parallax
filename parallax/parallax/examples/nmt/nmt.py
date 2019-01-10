@@ -286,7 +286,8 @@ def add_arguments(parser):
   parser.add_argument("--num_intra_threads", type=int, default=0,
                       help="number of intra_op_parallelism_threads")
 
-
+  parser.add_argument("--vocab_size_limit", type=int, default=0,
+                      help="limit of vocabulary size")
 def create_hparams(flags):
   """Create training hparams."""
   return tf.contrib.training.HParams(
@@ -351,6 +352,7 @@ def create_hparams(flags):
       eos=flags.eos if flags.eos else vocab_utils.EOS,
       subword_option=flags.subword_option,
       check_special_token=flags.check_special_token,
+      vocab_size_limit=None if flags.vocab_size_limit==0 else flags.vocab_size_limit,
 
       # Misc
       forget_bias=flags.forget_bias,
@@ -438,7 +440,9 @@ def extend_hparams(hparams):
       check_special_token=hparams.check_special_token,
       sos=hparams.sos,
       eos=hparams.eos,
-      unk=vocab_utils.UNK)
+      unk=vocab_utils.UNK,
+      vocab_size_limit=hparams.vocab_size_limit)
+  assert not hparams.vocab_size_limit or src_vocab_size == hparams.vocab_size_limit
 
   # Target vocab
   if hparams.share_vocab:
@@ -452,7 +456,10 @@ def extend_hparams(hparams):
         check_special_token=hparams.check_special_token,
         sos=hparams.sos,
         eos=hparams.eos,
-        unk=vocab_utils.UNK)
+        unk=vocab_utils.UNK,
+        vocab_size_limit=hparams.vocab_size_limit)
+
+  assert not hparams.vocab_size_limit or tgt_vocab_size == hparams.vocab_size_limit
   hparams.add_hparam("src_vocab_size", src_vocab_size)
   hparams.add_hparam("tgt_vocab_size", tgt_vocab_size)
   hparams.add_hparam("src_vocab_file", src_vocab_file)
