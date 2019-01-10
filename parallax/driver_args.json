@@ -1,8 +1,8 @@
 { "nmt": {
     "parallax_driver": "/home/soojeong/parallax/parallax/parallax/examples/nmt/nmt_distributed_driver.py",
     "args": [
-      "--src=de",
-      "--tgt=en",
+      "--src=en",
+      "--tgt=de",
       "--hparams_path=/home/soojeong/parallax/parallax/parallax/examples/nmt/standard_hparams/wmt16_gnmt_8_layer.json",
       "--out_dir=/tmp/nmt_out_soojeong",
       "--vocab_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/vocab.bpe.32000",
@@ -13,7 +13,10 @@
       "--epoch_size=4500966",
       "--steps_per_stats=50",
       "--override_loaded_hparams=True",
-      "--random_seed=100"
+      "--random_seed=100",
+      "--max_steps=29320",
+      "--num_embeddings_partitions=32",
+      "--search_partitions=False"
     ]
   },
   "lm1b": {
@@ -31,6 +34,24 @@
       "--input_file_pattern=/cmsdata/ssd1/cmslab/skip_thoughts/data/train-?????-of-00100",
       "--batch_size=128",
       "--log_frequency=50"
+    ]
+  },
+  "resnet50": {
+    "parallax_driver": "/home/soojeong/parallax/parallax/parallax/examples/tf_cnn_benchmarks/CNNBenchmark_distributed_driver.py",
+    "args": [
+      "--model=resnet50",
+      "--data_name=imagenet",
+      "--data_dir=/cmsdata/ssd1/cmslab/imagenet-data",
+      "--batch_size=64",
+      "--weight_decay=0.0001",
+      "--num_total_devices=48",
+      "--optimizer=momentum",
+      "--max_steps=45875",
+      "--use_tf_layers=False",
+      "--log_frequency=50",
+      "--log_frequency=1251",
+      "--ckpt_dir=/cmsdata/ssd1/cmslab/resnet50_48_gputs_again",
+      "--save_ckpt_steps=1251"
     ]
   }
 }
