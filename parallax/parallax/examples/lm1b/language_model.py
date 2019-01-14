@@ -23,7 +23,7 @@ class LM(base.Layer):
     # Use keep_prob 1.0 at evaluation
     self.keep_prob = 0.9
 
-    self.vocab_size = 793470
+    self.vocab_size = FLAGS.vocab_size_limit
     self.emb_size = 512
     self.state_size = 2048
     self.projected_size = 512

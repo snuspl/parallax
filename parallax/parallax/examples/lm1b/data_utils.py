@@ -8,13 +8,14 @@ import numpy as np
 
 class Vocabulary(object):
 
-    def __init__(self):
+    def __init__(self, vocab_size):
         self._token_to_id = {}
         self._token_to_count = {}
         self._id_to_token = []
         self._num_tokens = 0
         self._s_id = None
         self._unk_id = None
+        self._vocab_size= vocab_size
 
     @property
     def num_tokens(self):
@@ -53,12 +54,14 @@ class Vocabulary(object):
         return self._id_to_token[id_]
 
     @staticmethod
-    def from_file(filename):
-        vocab = Vocabulary()
+    def from_file(filename, vocab_size):
+        vocab = Vocabulary(vocab_size)
         with codecs.open(filename, "r", "utf-8") as f:
             for line in f:
                 word, count = line.strip().split()
                 vocab.add(word, int(count))
+                if vocab._num_tokens == vocab._vocab_size:
+                    break
         vocab.finalize()
         return vocab
 
