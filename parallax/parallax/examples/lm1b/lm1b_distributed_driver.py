@@ -45,6 +45,7 @@ flags.DEFINE_integer('log_frequency', 100,
 flags.DEFINE_boolean('sync', True, '')
 flags.DEFINE_boolean('deterministic', False, '')
 flags.DEFINE_integer('vocab_size_limit', 793470, '')
+flags.DEFINE_integer('emb_size', 512, '')
 FLAGS = flags.FLAGS
 
 

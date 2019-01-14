@@ -24,7 +24,7 @@ class LM(base.Layer):
     self.keep_prob = 0.9
 
     self.vocab_size = FLAGS.vocab_size_limit
-    self.emb_size = 512
+    self.emb_size = FLAGS.emb_size
     self.state_size = 2048
     self.projected_size = 512
     # Use num_sampled 0 (full softmax) at evaluation
