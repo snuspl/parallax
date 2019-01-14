@@ -49,6 +49,8 @@ def add_arguments(parser):
                         default=True)
     parser.add_argument('--epoch_size', type=int, default=0,
         help="total number of data instances")
+    parser.add_argument('--shuffle', type="bool", nargs="?", const=True,
+        default=True, help="")
 
 def before_train(train_model, train_sess, global_step, hparams, log_f,
                  num_replicas_per_worker):
@@ -67,13 +69,17 @@ def before_train(train_model, train_sess, global_step, hparams, log_f,
     utils.print_out("# Init train iterator, skipping %d elements" % skip_count)
     skip_count = train_model.skip_count_placeholder
     feed_dict = {}
-    feed_dict[skip_count] = 0
+    feed_dict[skip_count] = 0#[0 for i in range(num_replicas_per_worker)]
+    initializers = []
     init = train_model.iterator.initializer
     train_sess.run(init, feed_dict=feed_dict)
     return stats, info, start_train_time
 
 def main(_):
     default_hparams = nmt.create_hparams(FLAGS)
+    default_hparams.shuffle = FLAGS.shuffle
+    print(FLAGS.shuffle)
+    assert not default_hparams.shuffle
     ## Train / Decode
     out_dir = FLAGS.out_dir
     if not tf.gfile.Exists(out_dir): tf.gfile.MakeDirs(out_dir)
@@ -101,14 +107,14 @@ def main(_):
                              hparams.attention_architecture)
     
     train_model =\
-        model_helper.create_train_model(model_creator, hparams, scope=None, num_workers=1, jobid=0)
+        model_helper.create_train_model(model_creator, hparams, scope=None)
 
-    config = utils.get_config_proto(
+    config_proto = utils.get_config_proto(
         log_device_placement=log_device_placement,
         num_intra_threads=1,
         num_inter_threads=36)
 
-    def run(train_sess, num_workers, worker_id, num_replicas_per_worker, fetches):
+    def run(train_sess, num_workers, worker_id, num_replicas_per_worker):
          
         # Random
         random_seed = FLAGS.random_seed
@@ -131,47 +137,23 @@ def main(_):
             num_replicas_per_worker)
 
         epoch_steps = FLAGS.epoch_size / (FLAGS.batch_size * num_workers * num_replicas_per_worker)
+        print(epoch_steps)
 
-        for i in range(FLAGS.max_steps):
-          ### Run a step ###
-          start_time = time.time()
-          if hparams.epoch_step !=0 and hparams.epoch_step % epoch_steps == 0:
-              hparams.epoch_step  = 0
-              skip_count = train_model.skip_count_placeholder
-              feed_dict = {}
-              feed_dict[skip_count] = [0 for i in range(num_replicas_per_worker)]
-              init = train_model.iterator.initializer
-              train_sess.run(init, feed_dict=feed_dict)
+        unique_src_ids = 0
+        unique_tgt_ids = 0
+        for i in range(epoch_steps):
+            src_ids, tgt_ids = train_sess.run([
+                train_model.iterator.source,
+                train_model.iterator.target_input])
+            unique_src_ids += len(np.unique(src_ids))
+            unique_tgt_ids += len(np.unique(tgt_ids))
+            if i % 50 == 0:
+                print("%d, src: %d, tgt: %d" % ((i+1), unique_src_ids/(i+1), unique_tgt_ids/(i+1)))
+                sys.stdout.flush()
 
-          _, sparse_grads_size_, sparse_grads_unique_size_ = train_sess.run(fetches)
-          print('total_sparse_grads_size: %d, unique_sparse_grads_size: %d' % (np.sum(sparse_grads_size_), np.sum(sparse_grads_unique_size_)))
-
-          hparams.epoch_step += 1
-
-#    sess, num_workers, worker_id, num_replicas_per_worker = \
-#        parallax.parallel_run(train_model.graph,
-#                              FLAGS.resource_info_file,
-#                              sync=FLAGS.sync,
-#                              parallax_config=parallax_config.build_config())
     with train_model.graph.as_default():
-        optimizer = train_model.model.optimizer
-        params = train_model.model.params
-        clipped_grads, grad_norm_summary, grad_norm = model_helper.gradient_clip(
-            train_model.model.gradients, max_gradient_norm=hparams.max_gradient_norm)
-        train_model.model.grad_norm = grad_norm
-        train_model.model.update = optimizer.apply_gradients(
-            zip(clipped_grads, params), global_step=train_model.model.global_step)
-        
-        sparse_grads_size = []
-        sparse_grads_unique_size= []
-        for grad in train_model.model.gradients:
-           if isinstance(grad, tf.IndexedSlices):
-               sparse_grads_size = [tf.size(grad.indices, name='%s_size'%grad.op.name)]
-               unique, _ = tf.unique(grad.indices)
-               sparse_grads_unique_size = [tf.size(unique, name='%s_unique_size'%grad.op.name)]
-        fetches = [[train_model.model.update.name], sparse_grads_size, sparse_grads_unique_size]
-        sess = tf.train.MonitoredTrainingSession(config=config)
-        run(sess, 1, 0, 1, fetches)
+      sess = tf.train.MonitoredTrainingSession(config=config_proto)
+      run(sess, 1, 0, 1)
 
 if __name__ == "__main__":
     import logging

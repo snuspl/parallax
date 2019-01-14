@@ -49,6 +49,8 @@ def add_arguments(parser):
                         default=True)
     parser.add_argument('--epoch_size', type=int, default=0,
         help="total number of data instances")
+   parser.add_argument('--shuffle', type="bool", nargs="?", const=True,
+        default=True, help="")
 
 def before_train(train_model, train_sess, global_step, hparams, log_f,
                  num_replicas_per_worker):
@@ -75,6 +77,7 @@ def before_train(train_model, train_sess, global_step, hparams, log_f,
 
 def main(_):
     default_hparams = nmt.create_hparams(FLAGS)
+    default_hparams.shuffle = FLAGS.shuffle
     ## Train / Decode
     out_dir = FLAGS.out_dir
     if not tf.gfile.Exists(out_dir): tf.gfile.MakeDirs(out_dir)

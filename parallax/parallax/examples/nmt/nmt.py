@@ -364,6 +364,7 @@ def create_hparams(flags):
       metrics=flags.metrics.split(","),
       log_device_placement=flags.log_device_placement,
       random_seed=flags.random_seed,
+      shuffle=flags.shuffle,
       override_loaded_hparams=flags.override_loaded_hparams,
       num_keep_ckpts=flags.num_keep_ckpts,
       avg_ckpts=flags.avg_ckpts,
