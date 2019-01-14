@@ -43,13 +43,14 @@ flags.DEFINE_integer('max_steps', 1000000,
 flags.DEFINE_integer('log_frequency', 100,
                      """How many steps between two runop logs.""")
 flags.DEFINE_boolean('sync', True, '')
+flags.DEFINE_boolean('deterministic', False, '')
 FLAGS = flags.FLAGS
 
 
 def main(_):
 
     vocab = Vocabulary.from_file(os.path.join('/cmsdata/ssd1/cmslab/lm1b', "1b_word_vocab.txt"))
-    dataset = Dataset(vocab, os.path.join(FLAGS.datadir, "*"))
+    dataset = Dataset(vocab, os.path.join(FLAGS.datadir, "*"), FLAGS.deterministic)
 
     single_gpu_graph = tf.Graph()
     with single_gpu_graph.as_default():
