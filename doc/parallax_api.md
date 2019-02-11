@@ -3,7 +3,7 @@ This document explains Parallax API in detail. If you are a beginner of Parallax
 
 ## parallel_run
 
-`parallel_run` transforms the `single_gpu_graph` for the distributed environment specified in the `resource_info` file with a specific communication method. This is either MPI, PS or HYBRID style communication. Then, it returns the `session` for running the transformed graph with `num_workers`, `worker_id` and `num_replicas_per_worker`
+`parallel_run` transforms the `single_gpu_graph` for the distributed environment specified in the `resource_info` file with a specific communication method. This is either MPI (AR architecture), PS or HYBRID style communication. Then, it returns the `session` for running the transformed graph with `num_workers`, `worker_id` and `num_replicas_per_worker`
 ``` shell
 def parallel_run(single_gpu_graph, resource_info,
                  sync=True, parallax_config=None)
