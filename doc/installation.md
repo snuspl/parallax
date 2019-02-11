@@ -42,7 +42,7 @@ We tested on openmpi-3.0.0, NCCL 2.1.15(for cuda9.0) and NCCL 2.3.5(for cuda10.0
 ```shell
 $ cd ../horovod
 $ python setup.py sdist
-$ HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_GPU_ALLGATHER=NCCL HOROVOD_WITHOUT_PYTORCH=True pip install --no-cache-dir dist/horovod-*.tar.gz
+$ HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_WITHOUT_PYTORCH=True pip install --no-cache-dir dist/horovod-*.tar.gz
 ```
 
 ## Install Parallax
