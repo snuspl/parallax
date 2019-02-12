@@ -78,7 +78,7 @@ def create_train_model(
 
   with graph.as_default(), tf.container(scope or "train"):
     src_vocab_table, tgt_vocab_table = vocab_utils.create_vocab_tables(
-        src_vocab_file, tgt_vocab_file, hparams.share_vocab, hparams.vocab_size_limit)
+        src_vocab_file, tgt_vocab_file, hparams.share_vocab)
 
     src_dataset = tf.data.TextLineDataset(src_file)
     tgt_dataset = tf.data.TextLineDataset(tgt_file)
@@ -137,7 +137,7 @@ def create_eval_model(model_creator, hparams, scope=None, extra_args=None):
 
   with graph.as_default(), tf.container(scope or "eval"):
     src_vocab_table, tgt_vocab_table = vocab_utils.create_vocab_tables(
-        src_vocab_file, tgt_vocab_file, hparams.share_vocab, hparams.vocab_size_limit)
+        src_vocab_file, tgt_vocab_file, hparams.share_vocab)
     src_file_placeholder = tf.placeholder(shape=(), dtype=tf.string)
     tgt_file_placeholder = tf.placeholder(shape=(), dtype=tf.string)
     src_dataset = tf.data.TextLineDataset(src_file_placeholder)
@@ -185,7 +185,7 @@ def create_infer_model(model_creator, hparams, scope=None, extra_args=None):
 
   with graph.as_default(), tf.container(scope or "infer"):
     src_vocab_table, tgt_vocab_table = vocab_utils.create_vocab_tables(
-        src_vocab_file, tgt_vocab_file, hparams.share_vocab, hparams.vocab_size_limit)
+        src_vocab_file, tgt_vocab_file, hparams.share_vocab)
     reverse_tgt_vocab_table = lookup_ops.index_to_string_table_from_file(
         tgt_vocab_file, default_value=vocab_utils.UNK)
 

@@ -26,23 +26,6 @@ from tensorflow.python.layers import core as core_layers
 from tensorflow.python.layers import pooling as pooling_layers
 from tensorflow.python.training import moving_averages
 
-from tensorflow.python.ops.init_ops import Initializer
-
-FLAGS = tf.app.flags.FLAGS
-
-class MockGlorotInitializer(Initializer):
-  def __init__(self):
-    pass
-  def __call__(self, shape, dtype=None, partition_info=None, verify_shape=None):
-    return tf.constant((np.random.rand(*shape)-0.5) * 1e-4, dtype=dtype)
-
-
-class MockTrucNormInitializer(Initializer):
-  def __init__(self, stddev):
-    self.stddev = stddev
-  def __call__(self, shape, dtype=None, partition_info=None, verify_shape=None):
-    return tf.constant(np.random.normal(0, self.stddev, shape).clip(-2*self.stddev, 2*self.stddev), dtype=dtype)
-
 
 class ConvNetBuilder(object):
     """Builder of cnn net."""
@@ -142,7 +125,7 @@ class ConvNetBuilder(object):
             return conv_layers.conv2d(input_layer, filters, kernel_size,
                                       strides,
                                       padding, self.channel_pos,
-                                      kernel_initializer=MockGlorotInitializer() if FLAGS.deterministic else kernel_initializer,
+                                      kernel_initializer=kernel_initializer,
                                       use_bias=False)
         else:
             weights_shape = [kernel_size[0], kernel_size[1], num_channels_in,
@@ -173,7 +156,8 @@ class ConvNetBuilder(object):
              use_batch_norm=None,
              stddev=None,
              activation='relu',
-             bias=0.0):
+             bias=0.0,
+             is_batch_norm_gamma_as_one=True):
         """Construct a conv2d layer on top of cnn."""
         if input_layer is None:
             input_layer = self.top_layer
@@ -244,6 +228,8 @@ class ConvNetBuilder(object):
             else:
                 self.top_layer = conv
                 self.top_size = num_out_channels
+                self.batch_norm_config['is_batch_norm_gamma_as_one'] = \
+                    is_batch_norm_gamma_as_one
                 biased = self.batch_norm(**self.batch_norm_config)
             if activation == 'relu':
                 conv1 = tf.nn.relu(biased)
@@ -426,7 +412,7 @@ class ConvNetBuilder(object):
             return dropout
 
     def _batch_norm_without_layers(self, input_layer, decay, use_scale,
-                                   epsilon):
+                                   epsilon, is_batch_norm_gamma_as_one):
         """Batch normalization on `input_layer` without tf.layers."""
         # We make this function as similar as possible to the
         # tf.contrib.layers.batch_norm, to minimize the differences between
@@ -436,12 +422,19 @@ class ConvNetBuilder(object):
         beta = self.get_variable('beta', [num_channels], tf.float32, tf.float32,
                                  initializer=tf.zeros_initializer())
         if use_scale:
-            initializer=tf.ones_initializer()
+            if is_batch_norm_gamma_as_one:
+                initializer=tf.ones_initializer()
+            else:
+                initializer=tf.zeros_initializer()
             gamma = self.get_variable('gamma', [num_channels], tf.float32,
                                       tf.float32,
                                       initializer=initializer)
         else:
-            gamma = tf.constant(1.0, tf.float32, [num_channels])
+            if is_batch_norm_gamma_as_one:
+                value = 1.0
+            else:
+                value = 0.0
+            gamma = tf.constant(value, tf.float32, [num_channels])
         # For moving variables, we use tf.get_variable instead of
         # self.get_variable, since self.get_variable returns the result of
         # tf.cast which we cannot assign to.
@@ -471,7 +464,7 @@ class ConvNetBuilder(object):
         return bn
 
     def batch_norm(self, input_layer=None, decay=0.999, scale=False,
-                   epsilon=0.001):
+                   epsilon=0.001, is_batch_norm_gamma_as_one=True):
         """Adds a Batch Normalization layer."""
         if input_layer is None:
             input_layer = self.top_layer
@@ -493,7 +486,7 @@ class ConvNetBuilder(object):
                     scope=scope)
             else:
                 bn = self._batch_norm_without_layers(input_layer, decay, scale,
-                    epsilon)
+                    epsilon, is_batch_norm_gamma_as_one)
         self.top_layer = bn
         self.top_size = bn.shape[3] if self.data_format == 'NHWC' else bn.shape[
             1]
@@ -507,3 +500,4 @@ class ConvNetBuilder(object):
         self.top_layer = tf.nn.lrn(
             self.top_layer, depth_radius, bias, alpha, beta, name=name)
         return self.top_layer
+

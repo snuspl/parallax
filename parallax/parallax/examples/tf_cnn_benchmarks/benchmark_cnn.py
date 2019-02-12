@@ -576,7 +576,7 @@ class BenchmarkCNN(object):
         variable_mgr_init_ops = [local_var_init_op]
         local_var_init_op_group = tf.group(*variable_mgr_init_ops)
 
-        nth_ckpt = 0
+        nth_ckpt = 33
         while True:
             self._eval_once(saver, image_producer_ops, fetches,
                             local_var_init_op_group, nth_ckpt)

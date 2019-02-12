@@ -53,7 +53,7 @@ def add_arguments(parser):
         default=True, help="")
 
 def before_train(train_model, train_sess, global_step, hparams, log_f,
-                 num_replicas_per_worker):
+                 num_workers, worker_id, num_replicas_per_worker):
     """Misc tasks to do before training."""
     stats = train.init_stats()
     lr = train_sess.run(train_model.model.learning_rate)[0]
@@ -69,7 +69,15 @@ def before_train(train_model, train_sess, global_step, hparams, log_f,
     utils.print_out("# Init train iterator, skipping %d elements" % skip_count)
     skip_count = train_model.skip_count_placeholder
     feed_dict = {}
-    feed_dict[skip_count] = [0 for i in range(num_replicas_per_worker)]
+
+    print(num_workers)
+    data_size_per_worker = FLAGS.epoch_size / num_workers / num_replicas_per_worker
+    skip_values = []
+    for i in range(num_replicas_per_worker):
+      #skip_values.append(0)
+      skip_values.append(data_size_per_worker*(worker_id*num_replicas_per_worker+i))
+    print(skip_values)
+    feed_dict[skip_count] = skip_values
     initializers = []
     init = train_model.iterator.initializer
     train_sess.run(init, feed_dict=feed_dict)
@@ -132,7 +140,7 @@ def main(_):
         # This is the training loop.
         stats, info, start_train_time = before_train(
             train_model, train_sess, global_step, hparams, log_f,
-            num_replicas_per_worker)
+            num_workers, worker_id, num_replicas_per_worker)
 
         epoch_steps = FLAGS.epoch_size / (FLAGS.batch_size * num_workers * num_replicas_per_worker)
 
@@ -143,7 +151,14 @@ def main(_):
               hparams.epoch_step  = 0
               skip_count = train_model.skip_count_placeholder
               feed_dict = {}
-              feed_dict[skip_count] = [0 for i in range(num_replicas_per_worker)]
+
+              data_size_per_worker = FLAGS.epoch_size / num_workers / num_replicas_per_worker
+              skip_values = []
+              for i in range(num_replicas_per_worker):
+                #skip_values.append(0)
+                skip_values.append(data_size_per_worker*(worker_id*num_replicas_per_worker+i))
+              feed_dict[skip_count] = skip_values #[0 for i in range(num_replicas_per_worker)]
+             
               init = train_model.iterator.initializer
               train_sess.run(init, feed_dict=feed_dict)
 

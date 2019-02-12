@@ -25,10 +25,10 @@ class LM(base.Layer):
 
     self.vocab_size = FLAGS.vocab_size_limit
     self.emb_size = FLAGS.emb_size
-    self.state_size = 2048
+    self.state_size = 128
     self.projected_size = FLAGS.emb_size
     # Use num_sampled 0 (full softmax) at evaluation
-    self.num_sampled = 8192
+    self.num_sampled = FLAGS.batch_size*FLAGS.num_steps
 
   def build(self, input_shape):
     shard_size = int((self.vocab_size + self.num_shards - 1) / self.num_shards)

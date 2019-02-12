@@ -24,7 +24,7 @@ import tensorflow as tf
 
 flags.DEFINE_boolean('use_python32_barrier', False,
                      """When on, use threading.Barrier at python 3.2.""")
-flags.DEFINE_boolean('flush_stdout', False,
+flags.DEFINE_boolean('flush_stdout', True,
                      """When on, flush stdout everytime log_fn is called.""")
 FLAGS = flags.FLAGS
 

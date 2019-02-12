@@ -143,6 +143,10 @@ class BaseModel(object):
         opt = tf.train.GradientDescentOptimizer(self.learning_rate)
         tf.summary.scalar("lr", self.learning_rate)
       elif hparams.optimizer == "adam":
+        #opt = tf.train.AdamOptimizer(self.learning_rate, 
+        #                             beta1=0.9,
+        #                             beta2=0.999,
+        #                             epsilon=1e-06)
         opt = tf.train.AdamOptimizer(self.learning_rate)
       self.optimizer = opt
 
@@ -219,6 +223,21 @@ class BaseModel(object):
         decay_times = 4
       remain_steps = hparams.num_train_steps - start_decay_step
       decay_steps = int(remain_steps / decay_times)
+    elif hparams.decay_scheme == 'inverse_sqrt':
+      start_decay_step = hparams.warmup_steps
+      decay_factor = self.learning_rate * tf.sqrt(float(hparams.warmup_steps))
+      return tf.cond(
+        self.global_step < start_decay_step,
+        lambda: self.learning_rate,
+        lambda: (decay_factor / tf.sqrt(tf.cast(self.global_step, tf.float32))),
+        name="learning_rate_decay_cond")
+    elif hparams.decay_scheme == 'best':
+       t = tf.cast(self.global_step, tf.float32)
+       n = 36.0
+       p = 500.0
+       s = 600000.0
+       e = 1200000.0
+       return self.learning_rate * tf.minimum(tf.minimum(n, n * tf.pow(2*n, (s-n*t) / (e-s))), 1 + t * (n-1)/n*p)
     elif not hparams.decay_scheme:  # no decay
       start_decay_step = hparams.num_train_steps
       decay_steps = 0
@@ -498,14 +517,39 @@ class BaseModel(object):
     """
     pass
 
+
   def _compute_loss(self, logits):
     """Compute optimization loss."""
+    def _smooth_one_hot_labels(logits, labels, label_smoothing):
+       label_smoothing = tf.constant(label_smoothing, dtype=logits.dtype)
+       num_classes = tf.shape(logits)[-1]
+       return tf.one_hot(
+         tf.cast(labels, tf.int32),
+         num_classes,
+         on_value=1.0 - label_smoothing,
+         off_value=label_smoothing / tf.cast(num_classes - 1, label_smoothing.dtype),
+         dtype=logits.dtype)
+
     target_output = self.iterator.target_output
     if self.time_major:
       target_output = tf.transpose(target_output)
     max_time = self.get_max_time(target_output)
-    crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=target_output, logits=logits)
+    labels= target_output
+    label_smoothing = 0.1
+    smoothed_labels = _smooth_one_hot_labels(logits, labels, label_smoothing)
+    if hasattr(tf.nn, "softmax_cross_entropy_with_logits_v2"):
+      smoothed_labels = tf.stop_gradient(smoothed_labels)
+      cross_entropy_fn = tf.nn.softmax_cross_entropy_with_logits_v2
+    else:
+      cross_entropy_fn = tf.nn.softmax_cross_entropy_with_logits
+    crossent = cross_entropy_fn(
+        logits=logits, labels=smoothed_labels)
+    #crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(
+    #    labels=target_output, logits=logits)
+  #  params = tf.trainable_variables()
+  #  l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in params])
+  #  weight_decay = 0.00001
+  #  crossent += weight_decay * l2_loss
     target_weights = tf.sequence_mask(
         self.iterator.target_sequence_length, max_time, dtype=logits.dtype)
     if self.time_major:

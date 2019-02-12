@@ -53,10 +53,10 @@ def run_parallax_test(data_dir, apps, machine_nums, partitions, elsa_set, vocab_
         time.sleep(20)   
 
 if __name__ == '__main__':
-  apps = ['nmt']
+  apps = ['lm1b']
   data_dir = '/home/soojeong/vocab_exp/thp/parallax'
-  machine_nums = [1]
-  vocab_sizes = [36548]
+  machine_nums = [8]
+  vocab_sizes = [396735, 198367, 99183]
   test_count = 1
 
   # Get elsa indices to use from user.

@@ -131,7 +131,7 @@ def launch_mpi_driver(driver_path, args, config, partitions, m):
 def _init_global_vars(sess):
     hvd_bcast_global_vars_op = tf.get_default_graph() \
         .get_operation_by_name('auto_parallel_bcast_global_vars')
-    hvd_bcast_global_vars_op.sort()
+    #hvd_bcast_global_vars_op.sort()
     if hvd_bcast_global_vars_op is not None:
         for c in hvd_bcast_global_vars_op.control_inputs:
             sess.run(c)

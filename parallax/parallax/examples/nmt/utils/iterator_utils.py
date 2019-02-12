@@ -100,7 +100,7 @@ def get_iterator(src_dataset,
   tgt_eos_id = tf.cast(tgt_vocab_table.lookup(tf.constant(eos)), tf.int32)
 
   src_tgt_dataset = tf.data.Dataset.zip((src_dataset, tgt_dataset))
-  src_tgt_dataset = parallax.shard.shard(src_tgt_dataset)
+  #src_tgt_dataset = parallax.shard.shard(src_tgt_dataset)
   #src_tgt_dataset = src_tgt_dataset.shard(num_shards, shard_index)
   if skip_count is not None:
     src_tgt_dataset = src_tgt_dataset.skip(skip_count)

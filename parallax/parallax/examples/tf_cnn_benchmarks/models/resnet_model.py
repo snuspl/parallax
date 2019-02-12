@@ -73,7 +73,8 @@ def bottleneck_block_v1(cnn, depth, depth_bottleneck, stride):
         cnn.conv(depth_bottleneck, 3, 3, stride, stride, mode='SAME_RESNET',
                  use_batch_norm=True, bias=None)
         res = cnn.conv(depth, 1, 1, 1, 1, activation=None,
-                       use_batch_norm=True, bias=None)
+                       use_batch_norm=True, bias=None,
+                       is_batch_norm_gamma_as_one=False)
         output = tf.nn.relu(shortcut + res)
         cnn.top_layer = output
         cnn.top_size = depth

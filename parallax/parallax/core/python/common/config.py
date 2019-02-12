@@ -121,7 +121,7 @@ class ParallaxConfig(object):
                  average_sparse=False,
                  sess_config=None,
                  redirect_path=None,
-                 search_partitions=True,
+                 search_partitions=False,
                  communication_config=CommunicationConfig(),
                  ckpt_config=CheckPointConfig(),
                  profile_config=ProfileConfig()):

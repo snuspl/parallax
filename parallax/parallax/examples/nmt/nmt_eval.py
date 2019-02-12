@@ -289,7 +289,8 @@ def add_arguments(parser):
   parser.add_argument("--num_intra_threads", type=int, default=0,
                       help="number of intra_op_parallelism_threads")
 
-
+  parser.add_argument("--start_index", type=int, default=0,
+                      help="")
 def create_hparams(flags):
   """Create training hparams."""
   return tf.contrib.training.HParams(
@@ -622,7 +623,7 @@ def eval_fn(hparams, scope=None, target_session=""):
 
   # First evaluation
   ckpt_size = len(tf.train.get_checkpoint_state(model_dir).all_model_checkpoint_paths)
-  for ckpt_index in range(ckpt_size):
+  for ckpt_index in range(FLAGS.start_index, ckpt_size):
     train.run_full_eval(
       model_dir, infer_model, infer_sess,
       eval_model, eval_sess, hparams,

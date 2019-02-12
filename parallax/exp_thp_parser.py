@@ -8,11 +8,14 @@ def parse_thp(data_dir, parsed_data_dir):
   if not os.path.exists(parsed_data_dir):
     os.makedirs(parsed_data_dir)
 
+  print(data_dir)
   apps = os.listdir(data_dir)
+  print(apps)
   for app in apps:
     if app == 'parsed_thp' or app == 'parsed_comm':
       continue
 
+    print(app)
     if not os.path.exists(os.path.join(parsed_data_dir, app)):
       os.makedirs(os.path.join(parsed_data_dir, app))
     
@@ -30,7 +33,8 @@ def parse_thp(data_dir, parsed_data_dir):
       optimal_partition_exec_time = None
       for trial in range(1):
         trial_dir = os.path.join(machine_dir, 'Test-%d' % trial)
-
+        print(trial_dir)
+         
         if not os.path.exists(os.path.join(trial_dir, 'train_log')):
           print('train log is missing in %s' % trial_dir)
           continue
@@ -60,7 +64,7 @@ def parse_thp(data_dir, parsed_data_dir):
               match = re.match('(.*)step ([0-9]+) lr(.*) step-time (.*)s wps (.*) ppl(.*)', line)
               if match:
                 _, step, _, time, wps, _ = match.groups()
-                if int(step) >= 300 and int(step) <= 410:
+                if int(step) >= 250 and int(step) <= 410:
                   wps_num = float(wps.split('K')[0]) * 1000
                   wps_list.append(wps_num)
                   times.append(float(time))
@@ -71,8 +75,8 @@ def parse_thp(data_dir, parsed_data_dir):
     write_file.close() 
 
 if __name__ == '__main__':
-  apps = ['lm1b', 'nmt']
-  data_dir = '/home/soojeong/eurosys_exp'
-  parsed_data_dir = '/home/soojeong/eurosys_exp/parsed_thp'
+  apps = ['nmt']
+  data_dir = '/home/soojeong/nmt_label_smoothing_fast_shard_thp'
+  parsed_data_dir ='/home/soojeong/nmt_label_smoothing_fast_shard_thp/parsed_thp'
 
   parse_thp(data_dir, parsed_data_dir)

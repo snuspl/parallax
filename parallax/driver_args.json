@@ -4,7 +4,7 @@
       "--src=en",
       "--tgt=de",
       "--hparams_path=/home/soojeong/parallax/parallax/parallax/examples/nmt/standard_hparams/wmt16_gnmt_8_layer.json",
-      "--out_dir=/tmp/nmt_out_soojeong",
+      "--out_dir=/tmp/tmp_nmt4",
       "--vocab_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/vocab.bpe.32000",
       "--train_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/train.tok.clean.bpe.32000",
       "--dev_prefix=/cmsdata/ssd1/cmslab/nmt/wmt16/newstest2014.tok.bpe.32000",
@@ -14,15 +14,13 @@
       "--steps_per_stats=50",
       "--override_loaded_hparams=True",
       "--random_seed=100",
-      "--max_steps=29320",
-      "--num_embeddings_partitions=32",
-      "--search_partitions=False"
+      "--max_steps=43980"
     ]
   },
   "lm1b": {
     "parallax_driver": "/home/soojeong/parallax/parallax/parallax/examples/lm1b/lm1b_distributed_driver.py",
     "args": [
-      "--datadir=/cmsdata/ssd1/cmslab/lm1b",
+      "--datadir=/cmsdata/ssd1/cmslab/lm1b/training-monolingual.tokenized.shuffled",
       "--learning_rate=0.4",
       "--batch_size=128",
       "--log_frequency=50"
@@ -46,11 +44,10 @@
       "--weight_decay=0.0001",
       "--num_total_devices=48",
       "--optimizer=momentum",
-      "--max_steps=45875",
+      "--max_steps=50040",
       "--use_tf_layers=False",
       "--log_frequency=50",
-      "--log_frequency=1251",
-      "--ckpt_dir=/cmsdata/ssd1/cmslab/resnet50_48_gputs_again",
+      "--ckpt_dir=/cmsdata/ssd1/cmslab/resnet50_parallax2",
       "--save_ckpt_steps=1251"
     ]
   }

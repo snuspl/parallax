@@ -43,13 +43,14 @@ flags.DEFINE_integer('max_steps', 1000000,
 flags.DEFINE_integer('log_frequency', 100,
                      """How many steps between two runop logs.""")
 flags.DEFINE_boolean('sync', True, '')
+flags.DEFINE_integer('vocab_size_limit', 793470, '')
 FLAGS = flags.FLAGS
 
 
 def main(_):
 
-    vocab = Vocabulary.from_file(os.path.join('/cmsdata/ssd1/cmslab/lm1b', "1b_word_vocab.txt"))
-    dataset = Dataset(vocab, os.path.join(FLAGS.datadir, "*"))
+    vocab = Vocabulary.from_file(os.path.join('/cmsdata/ssd1/cmslab/lm1b', "1b_word_vocab.txt"), FLAGS.vocab_size_limit)
+    dataset = Dataset(vocab, os.path.join(FLAGS.datadir, "*"), deterministic=True)
 
     single_gpu_graph = tf.Graph()
     with single_gpu_graph.as_default():
