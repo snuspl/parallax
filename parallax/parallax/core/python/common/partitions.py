@@ -21,6 +21,8 @@ import time
 
 import tensorflow as tf
 
+from parallax.core.python.common.lib import *
+
 PARALLAX_MIN_PARTITIONS = "PARALLAX_MIN_PARTITIONS"
 PARALLAX_PARTITIONS = "PARALLAX_PARTITIONS"
 PARALLAX_SEARCH = "PARALLAX_SEARCH"
@@ -56,7 +58,7 @@ class PartitionStatCollector(object):
         self.p_list = []
         self.start = None
         self.min_partitions = int(os.environ[PARALLAX_MIN_PARTITIONS])
-        
+
     def setup_manager(self):
         if self.start is None:
             self.start = time.time()

@@ -75,6 +75,8 @@ def _parallax_run_master(single_gpu_meta_graph_def,
     if config.search_partitions and PARALLAX_MIN_PARTITIONS in os.environ:
       # Set to find automatic embedding partitoning
       p_to_test = len(config.resource_info['worker'])
+      min_partitions = int(os.environ[PARALLAX_MIN_PARTITIONS])
+      p_to_test = max(min_partitions, p_to_test)
       address = (config.resource_info['master'][0]['hostname'],
                  int(config.resource_info['master'][0]['port'][0]))
       
