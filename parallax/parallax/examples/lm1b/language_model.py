@@ -10,6 +10,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.layers import base
 
+import parallax
 
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_integer('num_variable_shards', 32, 'Number of variable shard')
@@ -30,17 +31,19 @@ class LM(base.Layer):
     self.num_sampled = 8192
 
   def build(self, input_shape):
-    shard_size = int((self.vocab_size + self.num_shards - 1) / self.num_shards)
-    self.emb = [self.add_variable(name='emb_%d' % i,
-                                  shape=[shard_size, self.emb_size],
-                                  initializer=tf.uniform_unit_scaling_initializer(),
-                                  trainable=True,
-                                  dtype=tf.float32) for i in range(self.num_shards)]
-    self.softmax_w = [self.add_variable(name='softmax_w_%d' % i,
-                                        shape=[shard_size, self.projected_size],
+    partitioner = parallax.get_partitioner(self.num_shards)
+    with tf.variable_scope(tf.get_variable_scope(), partitioner=partitioner):
+        self.emb = tf.get_variable('emb', 
+                                   shape=[self.vocab_size, self.emb_size],
+                                   initializer=tf.uniform_unit_scaling_initializer(),
+                                   trainable=True,
+                                   dtype=tf.float32)
+        self.softmax_w = tf.get_variable(name='softmax_w',
+                                        shape=[self.vocab_size, self.projected_size],
                                         initializer=tf.uniform_unit_scaling_initializer(),
                                         trainable=True,
-                                        dtype=tf.float32) for i in range(self.num_shards)]
+                                        dtype=tf.float32)
+
     self.softmax_b = self.add_variable(name='softmax_b',
                                        shape=[self.vocab_size],
                                        trainable=True,

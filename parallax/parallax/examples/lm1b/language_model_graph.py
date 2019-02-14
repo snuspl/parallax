@@ -38,9 +38,9 @@ def build_model():
     loss, final_state_c, final_state_h = model(placeholder_x, placeholder_y, placeholder_w, initial_state_c, initial_state_h, training=True)
     scaled_loss = loss * FLAGS.num_steps
 
-    emb_vars = model.emb
+    emb_vars = list(model.emb)
     lstm_vars = [model.W, model.B, model.W_P]
-    softmax_vars = model.softmax_w + [model.softmax_b]
+    softmax_vars = list(model.softmax_w) + [model.softmax_b]
     all_vars = emb_vars + lstm_vars + softmax_vars
     grads = tf.gradients(scaled_loss, all_vars)
 

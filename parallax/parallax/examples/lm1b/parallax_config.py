@@ -37,6 +37,7 @@ flags.DEFINE_boolean('boundary_among_servers', True,
 flags.DEFINE_boolean('boundary_between_workers_and_servers', True,
                      """Whether to use operation placement between workers and servers""")
 flags.DEFINE_string('export_graph_path', None, """export path to keep transformed graph definintion""")
+flags.DEFINE_boolean('search_partitions', False, "Whether to use find near-optimal partitions")
 FLAGS = flags.FLAGS
 
 def build_config():
@@ -75,5 +76,6 @@ def build_config():
     parallax_config.profile_config = profile_config
     parallax_config.redirect_path = FLAGS.redirect_path
     parallax_config.export_graph_path = FLAGS.export_graph_path
+    parallax_config.search_partitions = FLAGS.search_partitions
 
     return parallax_config
