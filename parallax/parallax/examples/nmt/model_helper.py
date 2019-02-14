@@ -8,6 +8,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+import parallax
 
 from tensorflow.python.ops import lookup_ops
 
@@ -305,15 +306,9 @@ def create_emb_for_encoder_and_decoder(share_vocab,
     ValueError: if use share_vocab but source and target have different vocab
       size.
   """
-
-  if num_partitions <= 1:
-    partitioner = None
-  else:
-    # Note: num_partitions > 1 is required for distributed training due to
-    # embedding_lookup tries to colocate single partition-ed embedding variable
-    # with lookup ops. This may cause embedding variables being placed on worker
-    # jobs.
-    partitioner = tf.fixed_size_partitioner(num_partitions)
+  partitioner = None
+  if num_partitions > 0:
+      partitioner = parallax.get_partitioner(num_partitions)
 
   if (src_embed_file or tgt_embed_file) and partitioner:
     raise ValueError(
