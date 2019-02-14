@@ -42,13 +42,15 @@ Example (assume `num_replicas_per_worker` is 3)
 
 ```shell
 ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect_path=None, 
-               communication_config=CommunicationConfig(), ckpt_config=CheckPointConfig())
+               search_partitions=False, communication_config=CommunicationConfig(), 
+               ckpt_config=CheckPointConfig())
 ```
 
 * run_option:  A string(PS, MPI or HYBRID). The communication method for training.
 * average_sparse: A boolean. If True, sparse parameters are updated by the averaged gradients over all replicas. Otherwise, the sum of all gradients are used.
 * sess_config: The session configuration used in `tf.train.MonitoredTrainingSession`
 * redirect_path: A string. Optional path to redirect logs as files.
+* search_partitions: A boolean. If True and there is a Parallax partitioner, Parallax's automatic partitioning mechanism is activated. Otherwise, the partitioning is turned off.
 * communication_config: The communication configuration for PS and MPI.
 	* PSConfig
 		* protocol: Specifies the protocol to be used by the server. Acceptable values include `"grpc"`, `"grpc+gdr"`, `"grpc+verbs"`, etc. `"grpc"` is the default.
@@ -83,6 +85,7 @@ parallax_config = parallax.Config()
 parallax_config.run_option = run_option,
 parallax_config.average_sparse = False
 parallax_config.redirect_path = redirect_path
+parallax_config.search_partitions = True
 parallax_config.communication_config = parallax.CommunicationConfig(ps_config, mpi_config)
 parallax_config.ckpt_config = ckpt_config
 parallax_config.profile_config = profile_config
