@@ -29,6 +29,7 @@ from parallax.core.python.common import graph_transform_lib
 from parallax.core.python.common.lib import *
 from parallax.core.python.common.config import ParallaxConfig
 from parallax.core.python.common.consts import *
+from parallax.core.python.common.partitions import *
 from parallax.core.python.mpi.runner import parallax_run_mpi
 from parallax.core.python.mpi.runner import launch_mpi_driver
 from parallax.core.python.ps.runner import parallax_run_ps
@@ -68,29 +69,58 @@ def _parallax_run_master(single_gpu_meta_graph_def,
     args = sys.argv[1:]
 
     sparse_grads, dense_grads = _get_grads(single_gpu_meta_graph_def)
+    
+    search_p = False
+    p_to_test = None
+    if config.search_partitions and PARALLAX_MIN_PARTITIONS in os.environ:
+      # Set to find automatic embedding partitoning
+      p_to_test = len(config.resource_info['worker'])
+      address = (config.resource_info['master'][0]['hostname'],
+                 int(config.resource_info['master'][0]['port'][0]))
+      
+      stat_collector = PartitionStatCollector(p_to_test, address)
+      search_p = True
+
     cleanup = None
     try:
-        if config.run_option == 'MPI' or \
-            (config.run_option == 'HYBRID' and len(sparse_grads) == 0):
+        while True:
+            m = None
+            if search_p:
+                m = stat_collector.setup_manager()
 
-            process, cleanup = \
-                    launch_mpi_driver(driver_path,
-                                      args,
-                                      config)
-            process.wait()
-        elif config.run_option == 'PS' or \
-            (config.run_option == 'HYBRID' and len(dense_grads) == 0):
-            chief_worker_process, logfiles, cleanup = \
-                    launch_ps_driver(driver_path,
-                                     args,
-                                     config)
-            chief_worker_process.wait()
-        elif config.run_option == 'HYBRID':
-            process, cleanup = \
-                launch_hybrid_driver(driver_path,
-                                     args,
-                                     config)
-            process.wait()
+	    if config.run_option == 'MPI' or \
+		(config.run_option == 'HYBRID' and len(sparse_grads) == 0):
+		num_workers = sum([max(1, len(w['gpus'])) for w in config.resource_info['worker']])
+		processes, cleanup = \
+			launch_mpi_driver(driver_path,
+					  args,
+					  config,
+                                          p_to_test,
+                                          m)
+	    elif config.run_option == 'PS' or \
+		(config.run_option == 'HYBRID' and len(dense_grads) == 0):
+		num_workers = len(config.resource_info['worker'])
+		processes, logfiles, cleanup = \
+			launch_ps_driver(driver_path,
+					 args,
+					 config,
+                                         p_to_test,
+                                         m)
+	    elif config.run_option == 'HYBRID':
+		num_workers = sum([max(1, len(w['gpus'])) for w in config.resource_info['worker']])
+		processes, cleanup = \
+		    launch_hybrid_driver(driver_path,
+					 args,
+					 config,
+                                         p_to_test,
+                                         m)
+
+	    if not search_p:
+		processes[0].wait()
+		break
+	    else:
+		search_p, p_to_test = \
+		    stat_collector.recv_exec_time(processes, cleanup, num_workers)
     except:
         traceback.print_exc()
     finally:

@@ -14,14 +14,21 @@
 # ==============================================================================
 
 import contextlib
+from multiprocessing.managers import BaseManager
 import os
+import Queue
 import threading
+import time
 
 import tensorflow as tf
 from tensorflow.python import pywrap_tensorflow as print_mdl
 from tensorflow.python.client import session
 from tensorflow.python.util import compat
-   
+
+from parallax.core.python.common.partitions import *
+COLLECT_STAT_START = 50
+COLLECT_STAT_END = 100
+
 def _parallax_init(self, target='', graph=None, config=None):
     """Overwrites the session.__init__."""
     self._init_internal(target, graph, config)  # pylint: disable=protected-access
@@ -35,14 +42,33 @@ def _parallax_run(self,
     fetches = self.parallax_session_context._convert_fetch(fetches)
     feed_dict = self.parallax_session_context._convert_feed(feed_dict)
 
-    if (self.parallax_session_context._profile_dir is None 
+    if not self.parallax_session_context._send_exec_time and \
+        (self.parallax_session_context._profile_dir is None 
         or (self.parallax_session_context._profile_steps is None \
             and self.parallax_session_context._profile_range is None)):
         return self._run_internal(fetches, feed_dict)
 
     with self.parallax_session_context._new_step() as state:
         step, locked = state
-        if locked and self.parallax_session_context._is_profile_step(step):
+        if locked and self.parallax_session_context._send_exec_time:
+             start_step = self.parallax_session_context._start_step
+             relative_step = step - start_step
+             if COLLECT_STAT_START <= relative_step and relative_step <= COLLECT_STAT_END:
+                 start = time.time()
+                 ret = self._run_internal(fetches, feed_dict)
+                 end = time.time()
+                 self.parallax_session_context._exec_time += (end - start)
+                 if step == COLLECT_STAT_END:
+                     host = self.parallax_session_context._master['hostname']
+                     port = int(self.parallax_session_context._master['port'][0])
+                     BaseManager.register('queue')
+                     m = BaseManager(address=(host, port), authkey='parallax_auth')
+                     m.connect()
+                     queue = m.queue()
+                     queue.put(self.parallax_session_context._exec_time)
+             else:
+                 ret = self._run_internal(fetches, feed_dict)
+        elif locked and self.parallax_session_context._is_profile_step(step):
             if not run_metadata:
                 run_metadata = self.parallax_session_context._run_metadata()
             if not options:
@@ -74,7 +100,8 @@ class ParallaxSessionContext(object):
                  profile_steps,
                  profile_range,
                  replica_dict,
-                 num_replicas_per_worker):
+                 num_replicas_per_worker,
+                 master):
         """Constructs an `ParallaxSessionContext` instance.
 
         Args:
@@ -84,8 +111,9 @@ class ParallaxSessionContext(object):
           replica_dict : A dictionary to map old tensor(operation) name
             to new tensor(operation) names.
           num_replicas_per_worker : Number of replicas per worker.
+          master: Stat collection master for partitioning.
         """
-
+        self._start_step = step
         self._step = step
         self._profile_dir = profile_dir
         self._profile_steps = profile_steps
@@ -94,6 +122,9 @@ class ParallaxSessionContext(object):
         self._replica_dict = replica_dict
         self._num_replicas_per_worker = num_replicas_per_worker
         self._run_metadata = None
+        self._send_exec_time = os.environ[PARALLAX_SEARCH] == 'True'
+        self._exec_time = 0
+        self._master = master
 
         for key, values in self._replica_dict.items():
             if len(values) == 1:
