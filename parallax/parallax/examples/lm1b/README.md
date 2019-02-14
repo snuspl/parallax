@@ -35,6 +35,7 @@ Also, we have a few more options you can choose for distributed running.
 | --save_ckpt_steps    | 0						| Number of steps between two consecutive checkpoints |
 | --save_n_ckpts_per_epoch | -1					| Number of checkpoints to save per each epoch |
 | --run_option		   | None					| The run option whether PS or MPI, None utilizes both |
+| --search_partitions | False           | Whether to use Parallax's partitioning method or not 
 
 You can adapt the distributed running with above options. For example, if you want to fix the communication model as MPI mode, you can add `run_option` value like below.
 
