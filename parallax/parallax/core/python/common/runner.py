@@ -73,15 +73,15 @@ def _parallax_run_master(single_gpu_meta_graph_def,
     search_p = False
     p_to_test = None
     if config.search_partitions and PARALLAX_MIN_PARTITIONS in os.environ:
-      # Set to find automatic embedding partitoning
-      p_to_test = len(config.resource_info['worker'])
-      min_partitions = int(os.environ[PARALLAX_MIN_PARTITIONS])
-      p_to_test = max(min_partitions, p_to_test)
-      address = (config.resource_info['master'][0]['hostname'],
-                 int(config.resource_info['master'][0]['port'][0]))
+        # Set to find automatic embedding partitoning
+        p_to_test = len(config.resource_info['worker'])
+        min_partitions = int(os.environ[PARALLAX_MIN_PARTITIONS])
+        p_to_test = max(min_partitions, p_to_test)
+        address = (config.resource_info['master'][0]['hostname'],
+                   int(config.resource_info['master'][0]['port'][0]))
       
-      stat_collector = PartitionStatCollector(p_to_test, address)
-      search_p = True
+        stat_collector = PartitionStatCollector(p_to_test, address)
+        search_p = True
 
     cleanup = None
     try:
@@ -92,7 +92,8 @@ def _parallax_run_master(single_gpu_meta_graph_def,
 
 	    if config.run_option == 'MPI' or \
 		(config.run_option == 'HYBRID' and len(sparse_grads) == 0):
-		num_workers = sum([max(1, len(w['gpus'])) for w in config.resource_info['worker']])
+                num_workers = sum([max(1, len(w['gpus'])) for w in \
+                    config.resource_info['worker']])
 		processes, cleanup = \
 			launch_mpi_driver(driver_path,
 					  args,
@@ -116,6 +117,8 @@ def _parallax_run_master(single_gpu_meta_graph_def,
 					 config,
                                          p_to_test,
                                          m)
+            else:
+                raise ValueError("Run option must be one of MPI, PS or HYBRID")
 
 	    if not search_p:
 		processes[0].wait()

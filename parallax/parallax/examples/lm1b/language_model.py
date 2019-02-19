@@ -33,16 +33,16 @@ class LM(base.Layer):
   def build(self, input_shape):
     partitioner = parallax.get_partitioner(self.num_shards)
     with tf.variable_scope(tf.get_variable_scope(), partitioner=partitioner):
-        self.emb = tf.get_variable('emb', 
-                                   shape=[self.vocab_size, self.emb_size],
-                                   initializer=tf.uniform_unit_scaling_initializer(),
-                                   trainable=True,
-                                   dtype=tf.float32)
-        self.softmax_w = tf.get_variable(name='softmax_w',
-                                        shape=[self.vocab_size, self.projected_size],
-                                        initializer=tf.uniform_unit_scaling_initializer(),
-                                        trainable=True,
-                                        dtype=tf.float32)
+      self.emb = tf.get_variable('emb', 
+                                 shape=[self.vocab_size, self.emb_size],
+                                 initializer=tf.uniform_unit_scaling_initializer(),
+                                 trainable=True,
+                                 dtype=tf.float32)
+      self.softmax_w = tf.get_variable(name='softmax_w',
+                                       shape=[self.vocab_size, self.projected_size],
+                                       initializer=tf.uniform_unit_scaling_initializer(),
+                                       trainable=True,
+                                       dtype=tf.float32)
 
     self.softmax_b = self.add_variable(name='softmax_b',
                                        shape=[self.vocab_size],

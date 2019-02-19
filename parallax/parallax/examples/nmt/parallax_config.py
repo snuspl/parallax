@@ -39,7 +39,7 @@ flags.DEFINE_boolean('boundary_among_servers', True,
 flags.DEFINE_boolean('boundary_between_workers_and_servers', True,
                      """Whether to use operation placement between workers and servers""")
 flags.DEFINE_string('export_graph_path', None, """export path to keep transformed graph definintion""")
-flags.DEFINE_boolean('search_partitions', False, "Whether to use find near-optimal partitions")
+flags.DEFINE_boolean('search_partitions', False, """Whether to use variable partitioning method""")
 FLAGS = flags.FLAGS
 
 def calculate_ckpt_steps():

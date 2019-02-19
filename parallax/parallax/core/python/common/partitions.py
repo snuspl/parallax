@@ -79,9 +79,9 @@ class PartitionStatCollector(object):
                 worker_exec_times.append(q.get())
  
             for p in processes:
-              if p.poll() is not None:
-                  all_alive = False
-                  break
+                if p.poll() is not None:
+                    all_alive = False
+                    break
 
         cleanup(None, None)
         time.sleep(10)
@@ -93,7 +93,7 @@ class PartitionStatCollector(object):
             self.exec_time_list.append(curr_exec_time)
 
             if self.prev_p:
-		if self.prev_exec_time < curr_exec_time:
+                if self.prev_exec_time < curr_exec_time:
 		    # decrease or stop
                     if self.prev_p > curr_p:
                         stop = True
@@ -104,7 +104,7 @@ class PartitionStatCollector(object):
                     assert (self.prev_exec_time / curr_exec_time) > 1
 		    # keep increase or keep decrease
 		    if self.prev_p < curr_p:
-			    self.p_to_test *= 2
+	                self.p_to_test *= 2
 		    else:
 			self.p_to_test /= 2
 
@@ -143,8 +143,8 @@ class PartitionStatCollector(object):
         print(self.exec_time_list)
         
         if len(self.p_list) < 3:
-          min_exec_time = min(self.exec_time_list)
-          return self.p_list[self.exec_time_list.index(min_exec_time)]
+            min_exec_time = min(self.exec_time_list)
+            return self.p_list[self.exec_time_list.index(min_exec_time)]
             
         max_time = float(max(self.exec_time_list))
         exec_times = [t / max_time for t in self.exec_time_list]
@@ -158,10 +158,10 @@ class PartitionStatCollector(object):
         min_exec_time = None
         optimal_p = None
         for i in range(min_p, max_p + 1):
-          prediction = fitfunc(i, p[0], p[1], p[2])
+            prediction = fitfunc(i, p[0], p[1], p[2])
 
-          if min_exec_time is None or min_exec_time > prediction:
-            min_exec_time = prediction
-            optimal_p = i
+            if min_exec_time is None or min_exec_time > prediction:
+                min_exec_time = prediction
+                optimal_p = i
 
         return optimal_p
