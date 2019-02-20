@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
+from parallax.core.python.common.partitions import get_partitioner
 from parallax.core.python.common.runner import parallel_run
 from parallax.core.python.common import shard
 from parallax.core.python.common.lib import parallax_log as log

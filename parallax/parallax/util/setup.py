@@ -123,6 +123,7 @@ REQUIRED_PACKAGES = [
     'protobuf >= 3.3.0',
     'nltk >= 3.0.0',
     'ephemeral-port-reserve',
+    'scipy >= 1.1.0',
 ]
 
 TEST_PACKAGES = [

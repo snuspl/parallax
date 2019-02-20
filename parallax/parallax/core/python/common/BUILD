@@ -45,6 +45,7 @@ native.py_library(
         "lib",
         "graph_transform_lib",
         "consts",
+        "partitions",
         "//parallax/core/python/ps:runner",
         "//parallax/core/python/mpi:runner",
         "//parallax/core/python/hybrid:runner"
@@ -67,6 +68,12 @@ native.py_library(
 )
 
 native.py_library(
+    name = "partitions",
+    srcs = ["partitions.py"],
+    deps = [
+    ],
+)
+native.py_library(
     name = "common",
     srcs = ["__init__.py"],
     deps = [
@@ -75,6 +82,7 @@ native.py_library(
         "shard",
         "config",
         "session_context",
+        "partitions"
     ],
 )
 

@@ -45,6 +45,7 @@ Besides, we have a few more options you can choose for distributed running.
 | --save_ckpt_steps    | 0						| Number of steps between two consecutive checkpoints |
 | --run_option		   | None					| The run option whether PS or MPI, None utilizes both |
 | --epoch_size 		   | 0						| total number of data instances |
+| --search_partitions   | False              | Whether to use Parallax's variable partitioning method or not |
 
 You can adapt the distributed running with above options. For example, you can run the GNMT WMT German-English model in MPI mode by just adding `--run_option` value to the script like below:
 

@@ -86,6 +86,16 @@ slice_size = tf.cond(tf.less(shard_id, remainder), lambda: shard_size + 1,
                      lambda: shard_size)
 data_files = tf.slice(data_files, [slice_begin], [slice_size])
 ```
+## Variable partitioning
+Parallax finds a near-optimal number of partitions to maximize parallelism while maintaining low computation and communication overhead. We support `tf.fixed_size_partitioner` with the number of partitions that Parallax finds using an internal cost model that predicts iteration time as a function of the number of partitions.
+If some of the variables are assumed large enough to be partitioned, construct partitioner using `parallax.get_partitioner` with the minimum number of partitions possible without memory exceptions as an argument. By assigning `search_partitions` as True or False in ParallaxConfig, partitioning can be turned on or off. When there is a Parallax partitioner with `search_partitions=False`, the minimum number of partitions are used.
+```shell
+partitioner = parallax.get_partitioner(min_partitions)
+with tf.variable_scope(
+     "emb", partitioner=partitioner) as scope:
+     emb_v = tf.get_variable(
+          "emb_mat_var", [num_trainable_tokens, emb_size])
+```
 
 ## Setting Environment Variables
 Parallax reads the environment variables below from the machine where an application is launched. `CUDA_VISIBLE_DEVICES` is set with the information from `resource_info` so that the user defined value will be ignored.
