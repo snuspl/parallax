@@ -202,11 +202,12 @@ def _place_post_grad_agg_ops_hybrid(ps_device,
         parallax_log.debug('boundary between servers: %s, %s -> %s' % (op.name, before[op.name].to_string(), op.device))
 
 def _add_broadcast_ops(target, worker_id):
+    global_step = tf.identity(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0].op.outputs[0])
     bcast_global_variables_ops = []
     with tf.device('/job:worker/task:%d' % worker_id):
         for var in target:
             bcast_global_variables_ops.append(
-                tf.assign(var, hvd.broadcast(var, 0)))
+                tf.assign(var, hvd.broadcast(var, global_step, 0)))
         with tf.control_dependencies(bcast_global_variables_ops):
             tf.no_op(name='auto_parallel_bcast_global_vars')
 

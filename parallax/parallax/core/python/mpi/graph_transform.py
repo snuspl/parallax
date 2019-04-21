@@ -24,20 +24,23 @@ from parallax.core.python.common.lib import *
 
 
 def _add_broadcast_ops():
+    global_step = tf.identity(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0].op.outputs[0])
     bcast_global_variables_ops = []
     for var in tf.global_variables():
         bcast_global_variables_ops.append(
-            tf.assign(var, hvd.broadcast(var, 0)))
+            tf.assign(var, hvd.broadcast(var, global_step, 0)))
     with tf.control_dependencies(bcast_global_variables_ops):
         tf.no_op(name='auto_parallel_bcast_global_vars')
 
 
 def _add_aggregation_ops(gradients_info, op_to_control_consumer_ops, config):
+    global_step = tf.identity(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0].op.outputs[0])
     grad_tensor = gradients_info._grad
     if isinstance(grad_tensor, tf.Tensor):
         grad = grad_tensor
         grad_consumers = [c for c in grad.consumers()]
         agg_grad = hvd.allreduce(grad,
+                                 global_step,
                                  average_dense=True,
                                  average_sparse=config.average_sparse,
                                  use_allgatherv=config.communication_config.mpi_config.use_allgatherv)
@@ -52,6 +55,7 @@ def _add_aggregation_ops(gradients_info, op_to_control_consumer_ops, config):
         indices_consumers = [c for c in indices.consumers()]
         agg_grad = \
             hvd.allreduce(tf.IndexedSlices(grad, indices, dense_shape),
+                          global_step,
                           average_dense=True,
                           average_sparse=config.average_sparse,
                           use_allgatherv=config.communication_config.mpi_config.use_allgatherv)
