@@ -530,7 +530,10 @@ def add_sync_op(worker_id,
                 with tf.control_dependencies(var_update_deps):
                    for i, q in enumerate(var_update_sync_queues):
                         if i != worker_id:
-                            queue_ops.append(q.enqueue(token))
+                            def true_fn():
+                                with tf.control_dependencies([q.dequeue()]):
+                                    return q.enqueue(token)
+                            queue_ops.append(tf.cond(q.size() > 0, true_fn, lambda: q.enqueue(token)))
                         else:
                             queue_ops.append(tf.no_op())
             else:
@@ -1697,7 +1700,10 @@ def add_sync_op_only_between(worker_id,
                   with tf.control_dependencies(assign_global_grad_buf):
                     for i,q in enumerate(grad_update_sync_queues):
                       if i != worker_id:
-                          queue_ops.append(q.enqueue(token))
+                          def true_fn():
+                              with tf.control_dependencies([q.dequeue()]):
+                                  return q.enqueue(token)
+                          queue_ops.append(tf.cond(q.size() > 0, true_fn, lambda: q.enqueue(token)))
                       else:
                           queue_ops.append(tf.no_op())
                 else:
@@ -1878,7 +1884,10 @@ def add_sync_op_only_between(worker_id,
                 token = tf.constant(False)
                 with tf.control_dependencies(var_update_deps):
                     for i, q in enumerate(var_update_global_sync_queues):
-                            queue_ops.append(q.enqueue(token))
+                            def true_fn():
+                                with tf.control_dependencies([q.dequeue()]):
+                                    return q.enqueue(token)
+                            queue_ops.append(tf.cond(q.size() > 0, true_fn, lambda: q.enqueue(token)))
 
         local_chief_id = worker_id - local_worker_id
         with tf.device('/job:worker/task:%d/cpu:0' % local_chief_id):
@@ -1904,7 +1913,10 @@ def add_sync_op_only_between(worker_id,
                 with tf.control_dependencies(var_update_deps):
                     for i, q in enumerate(var_update_local_sync_queues):
                         if i != local_worker_id:
-                            queue_ops.append(q.enqueue(token))
+                            def true_fn():
+                              with tf.control_dependencies([q.dequeue()]):
+                                  return q.enqueue(token)
+                            queue_ops.append(tf.cond(q.size() > 0, true_fn, lambda: q.enqueue(token)))
                         else:
                             queue_ops.append(tf.no_op())
             else:
