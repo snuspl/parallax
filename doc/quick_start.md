@@ -2,10 +2,8 @@
 Parallax mainly focuses on automatic parallelization of deep learning model graphs for a single device(CPU or GPU) with data parallelism. For automatic parallelization, Parallax requires some basic elements; resource information of the distributed environment, a single device graph, a data partitioning logic for data parallelism, a training method (asynchronous/synchronous), and a `run` function to invoke the computation of the distributed version of the graph.
 
 ## Resource Information
-Parallax supports both communication methods of using Parameter Server(PS) or MPI implementation. Parallax automatically transforms a single device graph into a PS or MPI style graph, then compares their performance to choose the faster one. This process requires `ps`, and `worker` tasks. `ps` is only used for Parameter Server architecture for storing subsets of model parameter values in memory. `worker` is responsible for computations with a disjoint subset of input data. We assume a homogeneous environment where the number of GPUs per worker are equal.
-
-Parallax receives resource information as a file with the IP address and GPU ids(optional), as shown below. If the GPU ids are not served, Parallax detects all the GPUs in the host. Parallax runs `ps` tasks(for Parameter Server architecture) in all the hosts in the resource information file.
-Note that MPI creates a worker for each GPU device, so the number of workers are the same as the number of GPUs even if workers are set with multiple GPUs. Parallax assumes that all hosts are accessible by [ssh without password](http://www.linuxproblem.org/art_9.html).
+We assume a homogeneous environment where the number of GPUs per worker are equal. Parallax receives resource information as a file with the IP address and GPU ids(optional), as shown below. If the GPU ids are not served, Parallax detects all the GPUs in the host. Parallax runs `ps` tasks(for HYBRID and Parameter Server architectures) in all the hosts in the resource information file.
+Note that AR architecture creates a worker for each GPU device, so the number of workers are the same as the number of GPUs even if workers are set with multiple GPUs. Parallax assumes that all hosts must be accessible by [ssh without password](http://www.linuxproblem.org/art_9.html)
 ```shell
 12.34.56.789: 0,1,2,3,4,5
 12.34.56.780: 1,3,4
@@ -87,6 +85,16 @@ slice_begin = tf.cond(tf.less(shard_id, remainder + 1),
 slice_size = tf.cond(tf.less(shard_id, remainder), lambda: shard_size + 1,
                      lambda: shard_size)
 data_files = tf.slice(data_files, [slice_begin], [slice_size])
+```
+## Variable partitioning
+Parallax finds a near-optimal number of partitions to maximize parallelism while maintaining low computation and communication overhead. We support `tf.fixed_size_partitioner` with the number of partitions that Parallax finds using an internal cost model that predicts iteration time as a function of the number of partitions.
+If some of the variables are assumed large enough to be partitioned, construct partitioner using `parallax.get_partitioner` with the minimum number of partitions possible without memory exceptions as an argument. By assigning `search_partitions` as True or False in ParallaxConfig, partitioning can be turned on or off. When there is a Parallax partitioner with `search_partitions=False`, the minimum number of partitions are used.
+```shell
+partitioner = parallax.get_partitioner(min_partitions)
+with tf.variable_scope(
+     "emb", partitioner=partitioner) as scope:
+     emb_v = tf.get_variable(
+          "emb_mat_var", [num_trainable_tokens, emb_size])
 ```
 
 ## Setting Environment Variables

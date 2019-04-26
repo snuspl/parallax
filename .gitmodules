@@ -1,6 +1,3 @@
-[submodule "tensorflow"]
-	path = tensorflow
-	url = https://github.com/snuspl/tensorflow.git
 [submodule "horovod"]
 	path = horovod
 	url = https://github.com/snuspl/horovod.git

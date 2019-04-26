@@ -3,7 +3,7 @@ This document explains Parallax API in detail. If you are a beginner of Parallax
 
 ## parallel_run
 
-`parallel_run` transforms the `single_gpu_graph` for the distributed environment specified in the `resource_info` file with a specific communication method. This is either MPI, PS or HYBRID style communication. Then, it returns the `session` for running the transformed graph with `num_workers`, `worker_id` and `num_replicas_per_worker`
+`parallel_run` transforms the `single_gpu_graph` for the distributed environment specified in the `resource_info` file with a specific communication method. This is either MPI (AR architecture), PS or HYBRID style communication. Then, it returns the `session` for running the transformed graph with `num_workers`, `worker_id` and `num_replicas_per_worker`
 ``` shell
 def parallel_run(single_gpu_graph, resource_info,
                  sync=True, parallax_config=None)
@@ -42,13 +42,15 @@ Example (assume `num_replicas_per_worker` is 3)
 
 ```shell
 ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect_path=None, 
-               communication_config=CommunicationConfig(), ckpt_config=CheckPointConfig())
+               search_partitions=False, communication_config=CommunicationConfig(), 
+               ckpt_config=CheckPointConfig())
 ```
 
 * run_option:  A string(PS, MPI or HYBRID). The communication method for training.
 * average_sparse: A boolean. If True, sparse parameters are updated by the averaged gradients over all replicas. Otherwise, the sum of all gradients are used.
 * sess_config: The session configuration used in `tf.train.MonitoredTrainingSession`
 * redirect_path: A string. Optional path to redirect logs as files.
+* search_partitions: A boolean. If True and there is a Parallax partitioner, Parallax's automatic partitioning mechanism is activated. Otherwise, the partitioning is turned off.
 * communication_config: The communication configuration for PS and MPI.
 	* PSConfig
 		* protocol: Specifies the protocol to be used by the server. Acceptable values include `"grpc"`, `"grpc+gdr"`, `"grpc+verbs"`, etc. `"grpc"` is the default.
@@ -63,9 +65,9 @@ ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect
 	* ckpt_dir: The checkpoint directory to store/restore global variables.
 	* save_ckpt_steps: The frequency, in number of global steps, that a checkpoint is saved using a default checkpoint saver.
 	* save_ckpt_secs: The frequency, in seconds, that a checkpoint is saved using a default checkpoint saver.
-* profile_config: The configuration for profile. CUPTI library path (e.g., /usr/local/cuda/extras/CUPTI/lib64) needs to be added to LD_LIBRARY_PATH
-        * profile_dir: Then profile directory to store RunMetadata.
-        * profile_steps: A list of steps when to store RunMetadata.
+* profile_config: The configuration for profile. CUPTI library path (e.g., /usr/local/cuda/extras/CUPTI/lib64) needs to be added to LD_LIBRARY_PATH.
+	* profile_dir: The profile directory to store RunMetadata.
+	* profile_steps: A list of steps when to store RunMetadata.
 Below code is an example of how to use **ParallaxConfig**.
 ```
 ckpt_config = parallax.CheckPointConfig(ckpt_dir=ckpt_dir,
@@ -83,6 +85,7 @@ parallax_config = parallax.Config()
 parallax_config.run_option = run_option,
 parallax_config.average_sparse = False
 parallax_config.redirect_path = redirect_path
+parallax_config.search_partitions = True
 parallax_config.communication_config = parallax.CommunicationConfig(ps_config, mpi_config)
 parallax_config.ckpt_config = ckpt_config
 parallax_config.profile_config = profile_config

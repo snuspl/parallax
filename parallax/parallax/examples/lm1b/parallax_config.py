@@ -29,6 +29,7 @@ flags.DEFINE_integer('save_ckpt_steps', None,
                      """Number of steps between two consecutive checkpoints""")
 flags.DEFINE_string('profile_dir', None, """Directory to save RunMetadata""")
 flags.DEFINE_string('profile_steps', None, """Comma separated porfile steps""")
+flags.DEFINE_string('profile_range', None, """profile_start_step,profile_end_step""")
 flags.DEFINE_boolean('local_aggregation', True,
                      """Whether to use local aggregation or not""")
 flags.DEFINE_boolean('boundary_among_servers', True,
@@ -36,6 +37,7 @@ flags.DEFINE_boolean('boundary_among_servers', True,
 flags.DEFINE_boolean('boundary_between_workers_and_servers', True,
                      """Whether to use operation placement between workers and servers""")
 flags.DEFINE_string('export_graph_path', None, """export path to keep transformed graph definintion""")
+flags.DEFINE_boolean('search_partitions', False, "Whether to use variable partitioning method")
 FLAGS = flags.FLAGS
 
 def build_config():
@@ -51,12 +53,21 @@ def build_config():
     mpi_config = parallax.MPIConfig(use_allgatherv=FLAGS.use_allgatherv,
                                     mpirun_options=FLAGS.mpirun_options)
     def get_profile_steps():
-        if not FLAGS.profile_steps:
-            return []
-        FLAGS.profile_steps = FLAGS.profile_steps.strip()
-        return [int(step) for step in FLAGS.profile_steps.split(',')]
+        if FLAGS.profile_steps:
+            FLAGS.profile_steps = FLAGS.profile_steps.strip()
+            return [int(step) for step in FLAGS.profile_steps.split(',')]
+        return None
+
+    def get_profile_range():
+        if FLAGS.profile_range:
+            FLAGS.profile_range = FLAGS.profile_range.strip()
+            splits = FLAGS.profile_range.split(',')
+            return (int(splits[0]), int(splits[1]))
+        return None
+
     profile_config = parallax.ProfileConfig(profile_dir=FLAGS.profile_dir,
-                                            profile_steps=get_profile_steps())
+                                            profile_steps=get_profile_steps(),
+                                            profile_range=get_profile_range())
     parallax_config = parallax.Config()
     parallax_config.run_option = FLAGS.run_option
     parallax_config.average_sparse = False
@@ -65,5 +76,6 @@ def build_config():
     parallax_config.profile_config = profile_config
     parallax_config.redirect_path = FLAGS.redirect_path
     parallax_config.export_graph_path = FLAGS.export_graph_path
+    parallax_config.search_partitions = FLAGS.search_partitions
 
     return parallax_config

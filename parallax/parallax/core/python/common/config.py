@@ -106,14 +106,20 @@ class CheckPointConfig(object):
 class ProfileConfig(object):
     def __init__(self,
                  profile_dir=None,
-                 profile_steps=None):
+                 profile_steps=None,
+                 profile_range=None,
+                 profile_worker=0):
         """
         Args:
           profile_dir: The profile directory to store RunMetadata.
           profile_steps: A list of steps when to store RunMetadata.
+          profile_range: A tuple of profile start and end step.
+          profile_worker: The worker id to profile.
         """
         self.profile_dir = profile_dir
         self.profile_steps = profile_steps
+        self.profile_range = profile_range
+        self.profile_worker = profile_worker
 
 class ParallaxConfig(object):
     def __init__(self,
@@ -121,6 +127,7 @@ class ParallaxConfig(object):
                  average_sparse=False,
                  sess_config=None,
                  redirect_path=None,
+                 search_partitions=True,
                  export_graph_path=None,
                  communication_config=CommunicationConfig(),
                  ckpt_config=CheckPointConfig(),
@@ -136,6 +143,8 @@ class ParallaxConfig(object):
           sess_config: tf.ConfigProto object to create the session with custom
             configurations.
           redirect_path: A string. Optional path to redirect logs as files.
+          search_partitions: A boolean. If true, Parallax searches optimal 
+             number of partitions for embedding parameters.
           export_graph_path: A string. Optional path to store graph.
           communication_config: A `CommunicationConfig` object to manage the
             configurations related to communication.
@@ -147,6 +156,7 @@ class ParallaxConfig(object):
         self.average_sparse = average_sparse
         self.sess_config = sess_config
         self.redirect_path = redirect_path
+        self.search_partitions = search_partitions
         self.export_graph_path = export_graph_path
 
         self.communication_config = communication_config

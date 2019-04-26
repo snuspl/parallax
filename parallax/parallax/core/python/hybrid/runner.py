@@ -28,11 +28,13 @@ import horovod.tensorflow as hvd
 
 from parallax.core.python.common.lib import *
 from parallax.core.python.common.consts import *
+from parallax.core.python.common.partitions import *
 from parallax.core.python.common.session_context import ParallaxSessionContext
 from parallax.core.python.hybrid.graph_transform import graph_transform_hybrid
 from parallax.core.python.ps.runner import launch_ps
 
-def create_mpi_script(driver_path, args, hostname, gpus, resource_info, machine_id, port=22):
+def create_mpi_script(driver_path, args, hostname, gpus, resource_info,
+                      machine_id, partitions, search, port=22):
     cmd = 'ssh -p %d %s "mkdir -p %s"' % (port, hostname, REMOTE_PARALLAX_ROOT)
     parallax_log.warning(colored('\n$ %s' % cmd, 'red'))
     proc = subprocess.Popen(args=cmd, shell=True)
@@ -50,8 +52,10 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info, machine_
         PARALLAX_MACHINE_ID: machine_id,
         PARALLAX_HOSTNAME: hostname,
         "PARALLAX_RESOURCE_INFO": resource_info,
+        PARALLAX_SEARCH: search,
     }
-
+    if partitions:
+         env[PARALLAX_PARTITIONS] = partitions
     cmd_env = ' '.join(
         map(lambda (k, v): 'export %s=%s;' % (k, v), env.iteritems()))
     try:
@@ -70,8 +74,7 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info, machine_
     proc = subprocess.Popen(args=remote_cmd, shell=True)
     proc.wait()
 
-
-def _prepare_workers(workers, driver_path, args, resource_info):
+def _prepare_workers(workers, driver_path, args, resource_info, partitions, search):
     unique_workers = {}
     machines = []
     for worker in workers:
@@ -83,12 +86,13 @@ def _prepare_workers(workers, driver_path, args, resource_info):
             unique_workers[hostname] = worker
 
     for i, hostname in enumerate(machines):
-        _prepare_worker(unique_workers[hostname], driver_path, args, resource_info, i)
+        _prepare_worker(unique_workers[hostname], driver_path, args, resource_info, i,
+                        partitions, search)
 
-
-def _prepare_worker(worker, driver_path, args, resource_info, machine_id):
+def _prepare_worker(worker, driver_path, args, resource_info, machine_id,
+                    partitions, search):
     create_mpi_script(driver_path, args, worker['hostname'], worker['gpus'],
-                      resource_info, machine_id)
+                      resource_info, machine_id, partitions, search)
 
 
 def _get_hybrid_cmd(workers, protocol, redirect_path, mpi_cmd_in_config):
@@ -109,21 +113,23 @@ def _get_hybrid_cmd(workers, protocol, redirect_path, mpi_cmd_in_config):
 
     return mpi_cmd
 
-def launch_hybrid_driver(driver_path, args, config):
+def launch_hybrid_driver(driver_path, args, config, partitions, m):
     resource_info = config.resource_info
     resource_info_file = serialize_resource_info(config.resource_info)
     protocol = config.communication_config.ps_config.protocol
     redirect_path = config.redirect_path   
 
     workers = config.resource_info['worker']
-    _prepare_workers(workers, driver_path, args, resource_info_file)
+    _prepare_workers(workers, driver_path, args, resource_info_file,
+                     partitions, m is not None)
 
     mpi_command = config.communication_config.mpi_config.mpirun_options
     hybrid_cmd = _get_hybrid_cmd(workers, protocol, redirect_path, mpi_command)
 
     processes = []
     print(colored('\n$ %s' % hybrid_cmd, 'red'))
-    proc = subprocess.Popen(args=hybrid_cmd, shell=True)
+    proc = subprocess.Popen(args=hybrid_cmd, shell=True, preexec_fn=os.setsid)
+    processes.append(proc)
 
     pss = resource_info['ps'] if 'ps' in resource_info else []
     for ps_id in range(len(pss)):
@@ -132,11 +138,13 @@ def launch_hybrid_driver(driver_path, args, config):
         processes.append(ps_proc)
 
     def cleanup(recv_signal, frame):
+        if m:
+            m.shutdown()
         for process in processes:
             os.killpg(os.getpgid(process.pid), signal.SIGINT)
 
     signal.signal(signal.SIGINT, cleanup)
-    return proc, cleanup
+    return processes, cleanup
 
 
 def _init_global_vars(sess):
@@ -175,14 +183,16 @@ def get_tf_clusterspec_for_hybrid(resource_info):
 
 def parallax_run_hybrid(single_gpu_meta_graph_def,
                         config):
-
     # Initialize horovod
     hvd.init()
     #worker_id = hvd.rank()
     local_worker_id = hvd.local_rank()
-    num_workers = hvd.size()
 
+    num_workers = hvd.size()
     machine_id, hostname = _get_worker_info()
+    create_profile_directory(config.profile_config.profile_dir,
+                             config.profile_config.profile_worker,
+                             config.resource_info, hostname)
 
     sess_config = config.sess_config
     if sess_config is None:
@@ -202,7 +212,17 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
         if machine_to_ids[w['hostname']] < machine_id:
             worker_id += max(1, len(w['gpus']))
     worker_id += hvd.local_rank()
-    print(worker_id)
+    if config.profile_config.profile_dir:
+        for ps_i, ps in enumerate(config.resource_info['ps']):
+            if ps['hostname'] == hostname:
+                if local_worker_id == 0:
+                    tasks = ['ps:%d'%ps_i, 'worker:%d'%worker_id]
+                else:
+                    tasks = ['worker:%d'%worker_id]
+                append_task_info(config.profile_config.profile_dir,
+                                 hostname, 
+                                 tasks)
+                break
     server = tf.train.Server(cluster_spec, job_name='worker',
                              task_index=worker_id, protocol=config.communication_config.ps_config.protocol,
                              config=sess_config)
@@ -220,8 +240,20 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
 
         tf.train.import_meta_graph(meta_graph_def)
         if config.export_graph_path:
-            export_hybrid_meta_graph(config.export_graph_path, worker_id)
+            export_meta_graph(config.export_graph_path, worker_id)
+        if config.profile_config.profile_dir:
+            path = os.path.join(config.profile_config.profile_dir, hostname,
+                                'worker:%d'%worker_id)
+            export_meta_graph(path, worker_id)
 
+            if worker_id != config.profile_config.profile_worker:
+                #Only one CUPTI profiler can run in a machine
+                #See tensorflow/tensorflow/core/platform/default/device_tracer.cc:L452
+                config.profile_config.profile_dir = None
+            else:
+                config.profile_config.profile_dir = \
+                    os.path.join(config.profile_config.profile_dir, hostname,
+                                 'worker:%d'%worker_id, 'run_meta')
         ckpt_hooks = \
             build_ckpt_hooks(config.get_ckpt_config()) \
             if worker_id == 0 else None
@@ -250,7 +282,9 @@ def parallax_run_hybrid(single_gpu_meta_graph_def,
             ParallaxSessionContext(step,
                                    config.profile_config.profile_dir,
                                    config.profile_config.profile_steps,
+                                   config.profile_config.profile_range,
                                    tensor_or_op_name_to_replica_names,
-                                   1)
+                                   1,
+                                   config.resource_info['master'][0])
         sess_context.set_parallax_session_context()
         return sess, num_workers, worker_id, 1

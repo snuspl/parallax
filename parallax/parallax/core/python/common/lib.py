@@ -136,14 +136,15 @@ def parse_resource_info(path, run_option):
     with open(path) as file:
         for machine_info in file:
             machines.extend(parse_machine_info(machine_info.strip()))
-
+    master_host = machines[0][0]
+    master = [{'hostname': master_host, 'port': _get_empty_port(master_host, 1), 'gpus': []}]
     ps = [{'hostname': hostname, 'port': _get_empty_port(hostname, 1), 'gpus': []} for hostname, _ in machines]
     worker = [{'hostname': hostname, 
                'port': _get_empty_port(hostname, 1 if run_option != 'HYBRID' \
                    or len(gpus) == 0 else len(gpus)), 'gpus': gpus} \
                        for hostname, gpus in machines]
 
-    resource_info = {'ps': ps, 'worker': worker}
+    resource_info = {'master': master, 'ps': ps, 'worker': worker}
     return resource_info
 
 
@@ -252,22 +253,12 @@ def get_average_execution_time(master, num_workers):
             "socket connection is broken")      
     return total_exec_time / num_workers
 
-
-def export_mpi_meta_graph(export_dir, worker_id):
-    _export_meta_graph(export_dir, worker_id, 'mpi', 'MPI')
-
-def export_ps_meta_graph(export_dir, worker_id):
-    _export_meta_graph(export_dir, worker_id, 'ps', 'PS')
-
-def export_hybrid_meta_graph(export_dir, worker_id):
-    _export_meta_graph(export_dir, worker_id, 'hybrid', 'HYBRID')    
- 
-def _export_meta_graph(export_dir, worker_id, comm, tag):
+def export_meta_graph(export_dir, worker_id):
     export_meta_graph_path = \
-        os.path.join(export_dir, comm,
-                     'worker-%d-%s' % (worker_id, str(uuid.uuid4())))
-    parallax_log.debug("Exporting %s graph of worker %d to %s"
-                      % (tag, worker_id, export_meta_graph_path))
+        os.path.join(export_dir,
+                     'worker-%d_metagraph' % worker_id)
+    parallax_log.debug("Exporting graph of worker %d to %s"
+                      % (worker_id, export_meta_graph_path))
     tf.train.export_meta_graph(export_meta_graph_path, as_text=True)
 
 
@@ -336,3 +327,31 @@ class TensorOrOpNameToReplicaNames(object):
 
     def export(self):
         return self._mapping
+
+def create_profile_directory(profile_dir, profile_worker, 
+                             resource_info, hostname):
+    if not profile_dir:
+      return
+
+    if not tf.gfile.Exists(profile_dir):
+        tf.gfile.MakeDirs(profile_dir)
+
+    for w_i, w in enumerate(resource_info['worker']):
+        if w['hostname'] != hostname:
+            continue
+        host_dir = os.path.join(profile_dir, w['hostname'])
+        if not tf.gfile.Exists(host_dir):
+            tf.gfile.MakeDirs(host_dir)
+        w_dir = os.path.join(host_dir, 'worker:%d' % w_i)
+        if not tf.gfile.Exists(w_dir):
+            tf.gfile.MakeDirs(w_dir)
+
+        run_meta_dir = os.path.join(w_dir, 'run_meta')
+        if not tf.gfile.Exists(run_meta_dir):
+            tf.gfile.MakeDirs(run_meta_dir)
+
+def append_task_info(profile_dir, hostname, tasks):
+    task_info = os.path.join(profile_dir, hostname, 'task_info')
+    with tf.gfile.Open(task_info, 'a') as f:
+        for t in tasks: 
+            f.write('%s\n' % t)
