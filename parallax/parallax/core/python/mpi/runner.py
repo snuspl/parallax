@@ -201,6 +201,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config):
         step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
         sess_context = \
             ParallaxSessionContext(step,
+                                   tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0],
                                    config.profile_config.profile_dir,
                                    config.profile_config.profile_steps,
                                    config.profile_config.profile_range,

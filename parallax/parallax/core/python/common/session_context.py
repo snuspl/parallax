@@ -38,7 +38,11 @@ def _parallax_run(self,
                   feed_dict=None,
                   options=None,
                   run_metadata=None):
-    
+
+    global_step_op = self.parallax_session_context._convert_fetch(
+        self.parallax_session_context._global_step_op)
+    global_step = self._run_internal(global_step_op)[0]
+
     fetches = self.parallax_session_context._convert_fetch(fetches)
     feed_dict = self.parallax_session_context._convert_feed(feed_dict)
 
@@ -68,7 +72,7 @@ def _parallax_run(self,
                      queue.put(self.parallax_session_context._exec_time)
              else:
                  ret = self._run_internal(fetches, feed_dict)
-        elif locked and self.parallax_session_context._is_profile_step(step):
+        elif locked and self.parallax_session_context._is_profile_step(global_step):
             if not run_metadata:
                 run_metadata = self.parallax_session_context._run_metadata()
             if not options:
@@ -81,7 +85,7 @@ def _parallax_run(self,
             ret = self._run_internal(
                 fetches, feed_dict, options, run_metadata)
             self.parallax_session_context._dump_profile(
-                run_metadata, 'run_meta_%d' % step)
+                run_metadata, 'run_meta_%d' % global_step)
             options.trace_level = old_trace_level
         else:
             ret = self._run_internal(fetches, feed_dict)
@@ -96,6 +100,7 @@ class ParallaxSessionContext(object):
    
     def __init__(self,
                  step,
+                 global_step_op,
                  profile_dir,
                  profile_steps,
                  profile_range,
@@ -115,6 +120,7 @@ class ParallaxSessionContext(object):
         """
         self._start_step = step
         self._step = step
+        self._global_step_op = global_step_op
         self._profile_dir = profile_dir
         self._profile_steps = profile_steps
         self._profile_range = profile_range
