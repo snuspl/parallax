@@ -108,7 +108,7 @@ class ProfileConfig(object):
                  profile_dir=None,
                  profile_steps=None,
                  profile_range=None,
-                 profile_worker=0):
+                 profile_worker=None):
         """
         Args:
           profile_dir: The profile directory to store RunMetadata.

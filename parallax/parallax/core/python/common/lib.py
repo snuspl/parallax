@@ -330,8 +330,7 @@ class TensorOrOpNameToReplicaNames(object):
     def export(self):
         return self._mapping
 
-def create_profile_directory(profile_dir, profile_worker, 
-                             resource_info, hostname):
+def create_profile_directory(profile_dir, resource_info, hostname):
     if not profile_dir:
       return
 

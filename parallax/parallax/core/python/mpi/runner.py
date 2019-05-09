@@ -141,7 +141,6 @@ def _init_global_vars(sess):
 def parallax_run_mpi(single_gpu_meta_graph_def, config):
     hostname = os.getenv(PARALLAX_HOSTNAME, 0)
     create_profile_directory(config.profile_config.profile_dir,
-                             config.profile_config.profile_worker,
                              config.resource_info, hostname)
 
     mpi_meta_graph_def, tensor_or_op_name_to_replica_names = \
@@ -166,7 +165,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config):
                                 'worker:%d'%worker_id)
             export_meta_graph(path, worker_id)
             
-            if worker_id != config.profile_config.profile_worker:
+            if config.profile_config.profile_worker != None and worker_id != config.profile_config.profile_worker:
                 #Only one CUPTI profiler can run in a machine
                 #See tensorflow/tensorflow/core/platform/default/device_tracer.cc:L452
                 config.profile_config.profile_dir = None
