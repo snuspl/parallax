@@ -33,7 +33,7 @@ flags.DEFINE_string('ckpt_dir', None, """Directory to save checkpoints""")
 flags.DEFINE_string('profile_dir', None, """Directory to save RunMetadata""")
 flags.DEFINE_string('profile_steps', None, """Comma separated porfile steps""")
 flags.DEFINE_string('profile_range', None, """profile_start_step,profile_end_step""")
-flags.DEFINE_integer('profile_worker', 0, """The worker to profile""")
+flags.DEFINE_integer('profile_worker', None, """The worker to profile""")
 flags.DEFINE_boolean('local_aggregation', True,
                      """Whether to use local aggregation or not""")
 flags.DEFINE_boolean('boundary_among_servers', True,
