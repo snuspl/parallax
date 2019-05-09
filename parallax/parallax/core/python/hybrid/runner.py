@@ -59,7 +59,7 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info,
         map(lambda (k, v): 'export %s=%s;' % (k, v), env.iteritems()))
     try:
         cmd_venv = ' source %s/bin/activate; '\
-                    % os.environ['VIRTUAL_ENV_PATH']
+                    % os.environ['VIRTUAL_ENV']
         full_cmd = ' '.join([cmd_env, cmd_venv, cmd_run])
     except:
         full_cmd = ' '.join([cmd_env, cmd_run])
