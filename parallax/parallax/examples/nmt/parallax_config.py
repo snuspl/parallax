@@ -21,7 +21,6 @@ import parallax
 flags = tf.app.flags
 flags.DEFINE_boolean('replicate_variables', True, """replicate_variables""")
 flags.DEFINE_string('protocol', 'grpc', """The method for managing variables""")
-flags.DEFINE_boolean('use_allgatherv', False, """use allgatherv instead of allgather""")
 tf.app.flags.DEFINE_string('mpirun_options', '', 'option for mpirun')
 flags.DEFINE_string('run_option', 'HYBRID',
                     'The run option whether PS, MPI or HYBRID')
@@ -66,8 +65,7 @@ def build_config():
                                   boundary_among_servers=FLAGS.boundary_among_servers,
                                   boundary_between_workers_and_servers=\
                                   FLAGS.boundary_between_workers_and_servers)
-    mpi_config = parallax.MPIConfig(use_allgatherv=FLAGS.use_allgatherv,
-                                    mpirun_options=FLAGS.mpirun_options)
+    mpi_config = parallax.MPIConfig(mpirun_options=FLAGS.mpirun_options)
     parallax_config = parallax.Config()
     parallax_config.run_option = FLAGS.run_option
     parallax_config.average_sparse = False
