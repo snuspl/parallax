@@ -84,7 +84,7 @@ def remote_exec(bash_script,
                 python_venv=None,
                 port=22):
     full_cmd = ' '.join(
-        map(lambda (k, v): 'export %s=%s;' % (k, v), env.iteritems()))
+        map(lambda k: 'export %s=%s;' % (k[0], k[1]), env.items()))
     if python_venv is not None:
         full_cmd += ' source %s/bin/activate; ' % python_venv
     full_cmd += bash_script
@@ -99,7 +99,7 @@ def remote_exec(bash_script,
 
 
 def _get_available_gpus(hostname):
-    result = subprocess.check_output('ssh %s ls /proc/driver/nvidia/gpus' % hostname, shell=True)
+    result = subprocess.check_output('ssh %s ls /proc/driver/nvidia/gpus' % hostname, shell=True).decode()
     return list(range(len(result.strip().split('\n'))))
 
 
@@ -155,7 +155,7 @@ def serialize_resource_info(resource_info):
         return '%s:%s:%s' % (m['hostname'], ','.join([str(port) for port in m['port']]), ','.join([str(gpu) for gpu in m['gpus']]))
     def serialize_machines(machines):
         return '+'.join([serialize_machine(m) for m in machines])
-    return '^'.join(['%s_%s' % (type, serialize_machines(machines)) for type, machines in resource_info.iteritems()])
+    return '^'.join(['%s_%s' % (type, serialize_machines(machines)) for type, machines in resource_info.items()])
 
 
 def deserialize_resource_info(resource_info_serialized):

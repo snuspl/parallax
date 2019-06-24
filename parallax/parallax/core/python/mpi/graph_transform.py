@@ -14,7 +14,7 @@
 # ==============================================================================
 
 import tensorflow as tf
-import horovod.tensorflow as hvd
+import horovod as hvd
 
 from parallax.core.python.common.graph_transform_lib import get_all_control_consumers
 from parallax.core.python.common.graph_transform_lib import update_consumers

@@ -16,7 +16,6 @@
 import contextlib
 from multiprocessing.managers import BaseManager
 import os
-import Queue
 import threading
 import time
 

@@ -261,7 +261,7 @@ def define_flags():
         'integer': flags.DEFINE_integer,
         'string': flags.DEFINE_string,
     }
-    for name, param_spec in six.iteritems(_DEFAULT_PARAMS):
+    for name, param_spec in six.items(_DEFAULT_PARAMS):
         if param_spec.flag_type not in define_flag:
             raise ValueError('Unknown flag_type %s' % param_spec.flag_type)
         else:

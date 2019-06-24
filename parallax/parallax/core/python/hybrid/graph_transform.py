@@ -16,7 +16,7 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.training.python.training import device_setter
-import horovod.tensorflow as hvd
+import horovod as hvd
 
 from parallax.core.python.common.graph_transform_lib import *
 from parallax.core.python.common.lib import *
