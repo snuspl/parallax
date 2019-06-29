@@ -16,6 +16,7 @@
 import re
 import sys
 import time
+from functools import reduce
 
 import tensorflow as tf
 from tensorflow.core.framework import attr_value_pb2
@@ -483,8 +484,8 @@ def add_sync_op(worker_id,
     var_op_to_finish_op = {}
     trainable_var_op_to_update_op = {}
     non_trainable_var_op_to_update_op = {}
-    all_var_update_op_types = dense_var_update_op_types.keys() \
-                              + sparse_var_update_op_types.keys()
+    all_var_update_op_types = list(dense_var_update_op_types.keys()) \
+                              + list(sparse_var_update_op_types.keys())
     for op in tf.get_default_graph().get_operations():
         # Find variable update ops
         if not op.type in all_var_update_op_types:
@@ -869,7 +870,7 @@ def construct_multi_gpu_graph_def(single_gpu_graph_def,
         for i in range(len(class_list.s)):
             s = class_list.s[i]
             if s.startswith(BINARY_ENCODED_COLOCATION_PREFIX):
-                op_name_to_bind_to = s[len(BINARY_ENCODED_COLOCATION_PREFIX):]
+                op_name_to_bind_to = s[len(BINARY_ENCODED_COLOCATION_PREFIX):].decode("utf-8")
                 if op_name_to_bind_to in op_names_to_replicate:
                     # delete colocation constraint if shared op needs to be
                     # colocated with replica op
@@ -1807,8 +1808,8 @@ def add_sync_op_only_between(worker_id,
     var_op_to_finish_op = {}
     trainable_var_op_to_update_op = {}
     non_trainable_var_op_to_update_op = {}
-    all_var_update_op_types = sparse_var_update_op_types.keys() \
-        + dense_var_update_op_types.keys()
+    all_var_update_op_types = list(sparse_var_update_op_types.keys()) \
+        + list(dense_var_update_op_types.keys())
 
     for op in tf.get_default_graph().get_operations():
         # Find variable update ops

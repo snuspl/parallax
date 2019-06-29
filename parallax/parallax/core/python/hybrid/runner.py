@@ -56,7 +56,7 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info,
     if partitions:
          env[PARALLAX_PARTITIONS] = partitions
     cmd_env = ' '.join(
-        map(lambda (k, v): 'export %s=%s;' % (k, v), env.iteritems()))
+        map(lambda k: 'export %s=%s;' % (k[0], k[1]), env.items()))
     try:
         cmd_venv = ' source %s/bin/activate; '\
                     % os.environ['VIRTUAL_ENV']

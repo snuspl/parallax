@@ -14,7 +14,10 @@
 # ==============================================================================
 import os
 from multiprocessing.managers import BaseManager
-import Queue
+try:
+  import Queue as queue
+except ImportError:
+  import queue
 import numpy as np
 from scipy import optimize
 import time
@@ -63,7 +66,7 @@ class PartitionStatCollector(object):
         if self.start is None:
             self.start = time.time()
         self.m = BaseManager(address=self.address, authkey='parallax_auth')
-        queue = Queue.Queue()
+        queue = queue.Queue()
         BaseManager.register('queue', callable=lambda:queue)
         self.m.start()
         return self.m
@@ -94,28 +97,28 @@ class PartitionStatCollector(object):
 
             if self.prev_p:
                 if self.prev_exec_time < curr_exec_time:
-		    # decrease or stop
+                    # decrease or stop
                     if self.prev_p > curr_p:
                         stop = True
-		    else:
-	                # search the oposite partitions
-			self.p_to_test = min(self.p_list) / 2
-		else:
+                    else:
+                        # search the oposite partitions
+                        self.p_to_test = min(self.p_list) / 2
+                else:
                     assert (self.prev_exec_time / curr_exec_time) > 1
-		    # keep increase or keep decrease
-		    if self.prev_p < curr_p:
-	                self.p_to_test *= 2
-		    else:
-			self.p_to_test /= 2
+                    # keep increase or keep decrease
+                    if self.prev_p < curr_p:
+                        self.p_to_test *= 2
+                    else:
+                        self.p_to_test /= 2
 
-		if self.p_to_test < self.min_partitions:
-		    stop = True
-	    else:
-		# increase first
-		self.p_to_test *= 2
+                if self.p_to_test < self.min_partitions:
+                    stop = True
+            else:
+                # increase first
+                self.p_to_test *= 2
 
-	    self.prev_p = curr_p
-	    self.prev_exec_time = curr_exec_time
+            self.prev_p = curr_p
+            self.prev_exec_time = curr_exec_time
         else:
             # communication error when num partitions is small
             if self.prev_p:
