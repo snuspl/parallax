@@ -546,7 +546,7 @@ def avg_checkpoints(model_dir, num_last_checkpoints, global_step,
     with tf.Session() as sess:
       sess.run(tf.initialize_all_variables())
       for p, assign_op, (name, value) in zip(placeholders, assign_ops,
-                                             six.iteritems(var_values)):
+                                             six.items(var_values)):
         sess.run(assign_op, {p: value})
 
       # Use the built saver to save the averaged checkpoint. Only keep 1

@@ -90,42 +90,42 @@ def _parallax_run_master(single_gpu_meta_graph_def,
             if search_p:
                 m = stat_collector.setup_manager()
 
-	    if config.run_option == 'MPI' or \
-		(config.run_option == 'HYBRID' and len(sparse_grads) == 0):
+            if config.run_option == 'MPI' or \
+                (config.run_option == 'HYBRID' and len(sparse_grads) == 0):
                 num_workers = sum([max(1, len(w['gpus'])) for w in \
                     config.resource_info['worker']])
-		processes, cleanup = \
-			launch_mpi_driver(driver_path,
-					  args,
-					  config,
+                processes, cleanup = \
+                        launch_mpi_driver(driver_path,
+                                          args,
+                                          config,
                                           p_to_test,
                                           m)
-	    elif config.run_option == 'PS' or \
-		(config.run_option == 'HYBRID' and len(dense_grads) == 0):
-		num_workers = len(config.resource_info['worker'])
-		processes, logfiles, cleanup = \
-			launch_ps_driver(driver_path,
-					 args,
-					 config,
+            elif config.run_option == 'PS' or \
+                (config.run_option == 'HYBRID' and len(dense_grads) == 0):
+                num_workers = len(config.resource_info['worker'])
+                processes, logfiles, cleanup = \
+                        launch_ps_driver(driver_path,
+                                         args,
+                                         config,
                                          p_to_test,
                                          m)
-	    elif config.run_option == 'HYBRID':
-		num_workers = sum([max(1, len(w['gpus'])) for w in config.resource_info['worker']])
-		processes, cleanup = \
-		    launch_hybrid_driver(driver_path,
-					 args,
-					 config,
+            elif config.run_option == 'HYBRID':
+                num_workers = sum([max(1, len(w['gpus'])) for w in config.resource_info['worker']])
+                processes, cleanup = \
+                    launch_hybrid_driver(driver_path,
+                                         args,
+                                         config,
                                          p_to_test,
                                          m)
             else:
                 raise ValueError("Run option must be one of MPI, PS or HYBRID")
 
-	    if not search_p:
-		processes[0].wait()
-		break
-	    else:
-		search_p, p_to_test = \
-		    stat_collector.recv_exec_time(processes, cleanup, num_workers)
+            if not search_p:
+                processes[0].wait()
+                break
+            else:
+                search_p, p_to_test = \
+                    stat_collector.recv_exec_time(processes, cleanup, num_workers)
     except:
         traceback.print_exc()
     finally:

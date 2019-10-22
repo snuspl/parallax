@@ -20,7 +20,6 @@ import parallax
 flags = tf.app.flags
 flags.DEFINE_boolean('replicate_variables', True, """replicate_variables""")
 flags.DEFINE_string('protocol', 'grpc', """The method for managing variables""")
-flags.DEFINE_boolean('use_allgatherv', False, """use allgatherv instead of allgather""")
 tf.app.flags.DEFINE_string('mpirun_options', '',
                            'option for mpirun')
 flags.DEFINE_string('run_option', 'HYBRID',
@@ -33,7 +32,7 @@ flags.DEFINE_string('ckpt_dir', None, """Directory to save checkpoints""")
 flags.DEFINE_string('profile_dir', None, """Directory to save RunMetadata""")
 flags.DEFINE_string('profile_steps', None, """Comma separated porfile steps""")
 flags.DEFINE_string('profile_range', None, """profile_start_step,profile_end_step""")
-flags.DEFINE_integer('profile_worker', 0, """The worker to profile""")
+flags.DEFINE_integer('profile_worker', None, """The worker to profile""")
 flags.DEFINE_boolean('local_aggregation', True,
                      """Whether to use local aggregation or not""")
 flags.DEFINE_boolean('boundary_among_servers', True,
@@ -68,8 +67,7 @@ def build_config():
                                   boundary_among_servers=FLAGS.boundary_among_servers,
                                   boundary_between_workers_and_servers=\
                                   FLAGS.boundary_between_workers_and_servers)
-    mpi_config = parallax.MPIConfig(use_allgatherv=FLAGS.use_allgatherv,
-                                    mpirun_options=FLAGS.mpirun_options)
+    mpi_config = parallax.MPIConfig(mpirun_options=FLAGS.mpirun_options)
     def get_profile_steps():
         if FLAGS.profile_steps:
             FLAGS.profile_steps = FLAGS.profile_steps.strip()

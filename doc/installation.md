@@ -1,5 +1,5 @@
 # Installation
-Parallax runs under Linux with Python 2.7; we haven't yet tested Parallax on other platforms and 3.3+.
+Parallax runs under Linux with Python 2.7 and 3.6; we haven't yet tested Parallax on other platforms and 3.3+.
 Parallax depends on a modified version of TensorFlow 1.6/1.11 and horovod 0.11.2 in parallax repository as submodules. *Each of these frameworks needs to be built and installed from source, which is explained in further detail below*. Parallax itself also requires installing from sources, and below explains the installation process step by step. We plan to provide binary files in the near future.
 
 First, clone the parallax repository on your linux machine:
@@ -42,7 +42,7 @@ We tested on openmpi-3.0.0, NCCL 2.1.15(for cuda9.0) and NCCL 2.3.5(for cuda10.0
 ```shell
 $ cd ../horovod
 $ python setup.py sdist
-$ HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_WITHOUT_PYTORCH=True pip install --no-cache-dir dist/horovod-*.tar.gz
+$ HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_WITHOUT_PYTORCH=True HOROVOD_WITHOUT_MXNET=True pip install --no-cache-dir dist/horovod-*.tar.gz
 ```
 
 ## Install Parallax

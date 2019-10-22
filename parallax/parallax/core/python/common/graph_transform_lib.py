@@ -16,6 +16,7 @@
 import re
 import sys
 import time
+from functools import reduce
 
 import tensorflow as tf
 from tensorflow.core.framework import attr_value_pb2
@@ -103,6 +104,7 @@ PARALLAX_PREFIX = u"AutoParallel-"
 PARALLAX_REPLICA_PREFIX = u"%sReplica-" % PARALLAX_PREFIX
 MIRROR_VARIABLE_INIT_OP = "auto_parallel_replicated_var_init_op"
 BINARY_ENCODED_COLOCATION_PREFIX = b"loc:@"
+COLOCATION_PREFIX = "loc:@"
 PARALLAX_GLOBAL_GRADS = 'PARALLAX_GLOBAL_GRADS'
 
 def parallax_replica_prefix(replica_id):
@@ -483,8 +485,8 @@ def add_sync_op(worker_id,
     var_op_to_finish_op = {}
     trainable_var_op_to_update_op = {}
     non_trainable_var_op_to_update_op = {}
-    all_var_update_op_types = dense_var_update_op_types.keys() \
-                              + sparse_var_update_op_types.keys()
+    all_var_update_op_types = list(dense_var_update_op_types.keys()) \
+                              + list(sparse_var_update_op_types.keys())
     for op in tf.get_default_graph().get_operations():
         # Find variable update ops
         if not op.type in all_var_update_op_types:
@@ -692,7 +694,7 @@ def replicate_variables_to_devices(meta_graph_def,
                                        .split(PARALLAX_REPLICA_PREFIX)[1]
                                        .split('/')[0])
                 op_name_to_bind_to = \
-                     BINARY_ENCODED_COLOCATION_PREFIX \
+                     COLOCATION_PREFIX \
                      + master_var_op_to_mirror_vars[current_binding_op][device_index].op.name
                 new_colocation_group.append(compat.as_bytes(op_name_to_bind_to))
             else:
@@ -724,7 +726,8 @@ def update_shard_values_for_worker(num_workers, worker_id):
 
     # find and update dataset with shard filter predicate
     if len(tf.get_collection(shard.SHARD_FILTER_PRED)) > 0:
-        shard_filter_pred_names = tf.get_collection(shard.SHARD_FILTER_PRED)
+        shard_filter_pred_names = [v.decode("ascii") \
+                for v in tf.get_collection(shard.SHARD_FILTER_PRED)]
         for op in tf.get_default_graph().get_operations():
             if 'dataset_factory' not in op.node_def.attr:
                 continue
@@ -823,7 +826,7 @@ def get_pipeline_ops(ops):
                 # Handle colocation groups of unstage op (NoOp)
                 assert len(curr_op.colocation_groups()) == 1
                 stage_no_op_name = curr_op.colocation_groups()[0][
-                                   len(BINARY_ENCODED_COLOCATION_PREFIX):]
+                                   len(BINARY_ENCODED_COLOCATION_PREFIX):].decode("ascii")
                 pipeline_ops.add(tf.get_default_graph()
                                  .get_operation_by_name(stage_no_op_name))
             elif curr_op.type in DEQUEUE_OP_TYPES:
@@ -872,7 +875,7 @@ def construct_multi_gpu_graph_def(single_gpu_graph_def,
         for i in range(len(class_list.s)):
             s = class_list.s[i]
             if s.startswith(BINARY_ENCODED_COLOCATION_PREFIX):
-                op_name_to_bind_to = s[len(BINARY_ENCODED_COLOCATION_PREFIX):]
+                op_name_to_bind_to = s[len(BINARY_ENCODED_COLOCATION_PREFIX):].decode("ascii")
                 if op_name_to_bind_to in op_names_to_replicate:
                     # delete colocation constraint if shared op needs to be
                     # colocated with replica op
@@ -884,7 +887,7 @@ def construct_multi_gpu_graph_def(single_gpu_graph_def,
                                 op_name_to_bind_to,
                                 parallax_replica_prefix(replica_id))
                         class_list.s[i] = compat.as_bytes(
-                            '%s%s' % (BINARY_ENCODED_COLOCATION_PREFIX,
+                            '%s%s' % (COLOCATION_PREFIX,
                                       new_op_name_to_bind_to))
         for item in to_delete:
             class_list.s.remove(item)
@@ -925,13 +928,13 @@ def construct_multi_gpu_graph_def(single_gpu_graph_def,
                 if new_node.op in STAGE_OP_TYPES + UNSTAGE_OP_TYPES:
                     new_node.attr['shared_name'].s = compat.as_bytes(
                         ops.prepend_name_scope(
-                            new_node.attr['shared_name'].s,
+                            compat.as_str(new_node.attr['shared_name'].s),
                             parallax_replica_prefix(replica_id)))
                 _update_colocation(new_node, replica_id)
                 if 'frame_name' in new_node.attr:
                     new_node.attr['frame_name'].s = compat.as_bytes(
                         ops.prepend_name_scope(
-                            new_node.attr['frame_name'].s,
+                            compat.as_str(new_node.attr['frame_name'].s),
                             parallax_replica_prefix(replica_id)))
                 tensor_or_op_name_to_replica_names.extend_mapping_from_nodedef(node, new_node)
         else:
@@ -1252,7 +1255,8 @@ def update_shard_info_for_in_graph(meta_graph_def, num_replicas):
     # update dataset factory if it uses shard and its consumer node is a replica
     if shard.SHARD_FILTER_PRED in meta_graph_def.collection_def:
         shard_filter_pred_names = \
-            meta_graph_def.collection_def[shard.SHARD_FILTER_PRED].bytes_list.value
+            [v.decode("ascii") for v in \
+            meta_graph_def.collection_def[shard.SHARD_FILTER_PRED].bytes_list.value]
         dataset_factory_replica_consumers = {}
         # collect dataset factory consumers if they are replicas
         for node in meta_graph_def.graph_def.node:
@@ -1813,8 +1817,8 @@ def add_sync_op_only_between(worker_id,
     var_op_to_finish_op = {}
     trainable_var_op_to_update_op = {}
     non_trainable_var_op_to_update_op = {}
-    all_var_update_op_types = sparse_var_update_op_types.keys() \
-        + dense_var_update_op_types.keys()
+    all_var_update_op_types = list(sparse_var_update_op_types.keys()) \
+        + list(dense_var_update_op_types.keys())
 
     for op in tf.get_default_graph().get_operations():
         # Find variable update ops

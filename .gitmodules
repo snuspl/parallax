@@ -3,4 +3,5 @@
 	url = https://github.com/snuspl/tensorflow.git
 [submodule "horovod"]
 	path = horovod
-	url = https://github.com/snuspl/horovod.git
+	url = https://github.com/horovod/horovod.git
+        branch = v0.16.3

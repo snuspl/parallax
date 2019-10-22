@@ -38,9 +38,7 @@ def _add_aggregation_ops(gradients_info, op_to_control_consumer_ops, config):
         grad = grad_tensor
         grad_consumers = [c for c in grad.consumers()]
         agg_grad = hvd.allreduce(grad,
-                                 average_dense=True,
-                                 average_sparse=config.average_sparse,
-                                 use_allgatherv=config.communication_config.mpi_config.use_allgatherv)
+                                 average=True)
         update_consumers(grad_consumers, grad, agg_grad)
         update_control_consumers(op_to_control_consumer_ops[grad.op],
                                  grad.op, agg_grad.op)
@@ -52,9 +50,7 @@ def _add_aggregation_ops(gradients_info, op_to_control_consumer_ops, config):
         indices_consumers = [c for c in indices.consumers()]
         agg_grad = \
             hvd.allreduce(tf.IndexedSlices(grad, indices, dense_shape),
-                          average_dense=True,
-                          average_sparse=config.average_sparse,
-                          use_allgatherv=config.communication_config.mpi_config.use_allgatherv)
+                          average=config.average_sparse)
         update_consumers(grad_consumers, grad, agg_grad.values)
         update_consumers(indices_consumers, indices, agg_grad.indices)
         update_control_consumers(op_to_control_consumer_ops[grad.op],

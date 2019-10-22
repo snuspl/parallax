@@ -68,6 +68,7 @@ ParallaxConfig(run_option=None, average_sparse=False, sess_config=None, redirect
 * profile_config: The configuration for profile. CUPTI library path (e.g., /usr/local/cuda/extras/CUPTI/lib64) needs to be added to LD_LIBRARY_PATH.
 	* profile_dir: The profile directory to store RunMetadata.
 	* profile_steps: A list of steps when to store RunMetadata.
+	* profile_range: A tuple which represent the range of steps when to store RunMetadata.
 Below code is an example of how to use **ParallaxConfig**.
 ```
 ckpt_config = parallax.CheckPointConfig(ckpt_dir=ckpt_dir,

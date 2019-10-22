@@ -50,19 +50,14 @@ class PSConfig(object):
 
 class MPIConfig(object):
     def __init__(self,
-                 use_allgatherv=False,
                  mpirun_options=''):
         """
           Args:
-          use_allgatherv: Specifies whether to utilize OpenMPI `allgatherv`
-            instead of NCCL 'allgather'. `use_allgatherv=False` is
-            recommended by Parallax.
           mpirun_options: A string or a list of strings. Specifies the extra
             configurations for mpirun. See
             https://www.open-mpi.org/doc/v3.0/man1/mpirun.1.php#sect3 for more
             details.
         """
-        self.use_allgatherv = use_allgatherv
         self.mpirun_options = self.parse_mpirun_options(mpirun_options)
 
     def parse_mpirun_options(self, mpirun_options):
@@ -108,7 +103,7 @@ class ProfileConfig(object):
                  profile_dir=None,
                  profile_steps=None,
                  profile_range=None,
-                 profile_worker=0):
+                 profile_worker=None):
         """
         Args:
           profile_dir: The profile directory to store RunMetadata.

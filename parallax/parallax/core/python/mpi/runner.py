@@ -57,7 +57,7 @@ def create_mpi_script(driver_path, args, hostname, gpus, partitions, search,
          env[PARALLAX_PARTITIONS] = partitions
 
     cmd_env = ' '.join(
-        map(lambda (k, v): 'export %s=%s;' % (k, v), env.iteritems()))
+        map(lambda k: 'export %s=%s;' % (k[0], k[1]), env.items()))
     try:
         cmd_venv = ' source %s/bin/activate; '\
                     % os.environ['VIRTUAL_ENV']
@@ -141,7 +141,6 @@ def _init_global_vars(sess):
 def parallax_run_mpi(single_gpu_meta_graph_def, config):
     hostname = os.getenv(PARALLAX_HOSTNAME, 0)
     create_profile_directory(config.profile_config.profile_dir,
-                             config.profile_config.profile_worker,
                              config.resource_info, hostname)
 
     mpi_meta_graph_def, tensor_or_op_name_to_replica_names = \
@@ -166,7 +165,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config):
                                 'worker:%d'%worker_id)
             export_meta_graph(path, worker_id)
             
-            if worker_id != config.profile_config.profile_worker:
+            if config.profile_config.profile_worker != None and worker_id != config.profile_config.profile_worker:
                 #Only one CUPTI profiler can run in a machine
                 #See tensorflow/tensorflow/core/platform/default/device_tracer.cc:L452
                 config.profile_config.profile_dir = None
@@ -201,6 +200,7 @@ def parallax_run_mpi(single_gpu_meta_graph_def, config):
         step = sess.run(tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0])
         sess_context = \
             ParallaxSessionContext(step,
+                                   tf.get_collection(tf.GraphKeys.GLOBAL_STEP)[0],
                                    config.profile_config.profile_dir,
                                    config.profile_config.profile_steps,
                                    config.profile_config.profile_range,
