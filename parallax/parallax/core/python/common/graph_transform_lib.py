@@ -1144,8 +1144,15 @@ def add_aggregate_gradients_ops(multi_gpu_meta_graph_def,
     def _update_gradient_consumers(consumer_op_names, control_consumer_op_names,
                                    old_tensor_name, new_tensor):
         graph = tf.get_default_graph()
-        consumer_ops = [graph.get_operation_by_name(name)
-                        for name in consumer_op_names]
+        consumer_ops = []
+        for name in consumer_op_names:
+            try:
+                op = graph.get_operation_by_name(name)
+                consumer_ops.append(op)
+            except KeyError:
+                continue
+        #consumer_ops = [graph.get_operation_by_name(name)
+        #                for name in consumer_op_names]
         control_consumer_ops = [graph.get_operation_by_name(name)
                                 for name in control_consumer_op_names]
         # Gradient consumers are currently using gradient generated

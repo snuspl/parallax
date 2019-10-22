@@ -52,6 +52,8 @@ def create_mpi_script(driver_path, args, hostname, gpus, resource_info,
         PARALLAX_HOSTNAME: hostname,
         "PARALLAX_RESOURCE_INFO": resource_info,
         PARALLAX_SEARCH: search,
+        "PATH": "$PATH:/bg/bin/openmpi/bin",
+        "LD_LIBRARY_PATH": "$LD_LIBRARY_PATH:/bg/bin/openmpi/lib"
     }
     if partitions:
          env[PARALLAX_PARTITIONS] = partitions
@@ -87,7 +89,7 @@ def _prepare_worker(worker, driver_path, args, resource_info, machine_id,
 
 
 def _get_hybrid_cmd(workers, protocol, redirect_path, mpi_cmd_in_config):
-    mpi_cmd = 'mpirun -bind-to none -map-by slot' \
+    mpi_cmd = '/bg/bin/openmpi/bin/mpirun -bind-to none -map-by slot' \
               ' -mca orte_base_help_aggregate 0'\
               ' -x NCCL_DEBUG=INFO'
     arg_runop = '-x %s=%s' % (PARALLAX_RUN_OPTION, PARALLAX_RUN_HYBRID)

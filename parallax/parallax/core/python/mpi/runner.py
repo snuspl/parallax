@@ -52,6 +52,8 @@ def create_mpi_script(driver_path, args, hostname, gpus, partitions, search,
         "PARALLAX_LOG_LEVEL": parallax_log_level,
         PARALLAX_HOSTNAME: hostname,
         PARALLAX_SEARCH: search,
+        "PATH": "$PATH:/bg/bin/openmpi/bin",
+        "LD_LIBRARY_PATH": "$LD_LIBRARY_PATH:/bg/bin/openmpi/lib"
     }
     if partitions:
          env[PARALLAX_PARTITIONS] = partitions
@@ -86,7 +88,7 @@ def _prepare_worker(worker, driver_path, args, partitions, search):
 
 def _get_mpi_cmd(config):
     workers = config.resource_info['worker']
-    mpi_cmd = 'mpirun -bind-to none -map-by slot' \
+    mpi_cmd = '/bg/bin/openmpi/bin/mpirun -bind-to none -map-by slot' \
               ' -mca orte_base_help_aggregate 0'\
               ' -x NCCL_DEBUG=INFO '
     mpi_cmd += config.communication_config.mpi_config.mpirun_options

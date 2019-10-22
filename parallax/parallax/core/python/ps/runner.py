@@ -76,6 +76,8 @@ def _get_ps_env(ps_info, config):
             str(gpuid) for gpuid in ps_info['gpus']),
         "PARALLAX_LOG_LEVEL": parallax_log_level,
         "PARALLAX_RESOURCE_INFO": serialize_resource_info(config.resource_info),
+        "PATH": "$PATH:/bg/bin/openmpi/bin",
+        "LD_LIBRARY_PATH": "$LD_LIBRARY_PATH:/bg/bin/openmpi/lib"
     }
 
     return env
@@ -130,6 +132,8 @@ def _get_worker_env(worker_id, config, partitions, search):
         PARALLAX_WORKER_ID: worker_id,
         PARALLAX_NUM_WORKERS: num_workers,
         PARALLAX_SEARCH: search,
+        "PATH": "$PATH:/bg/bin/openmpi/bin",
+        "LD_LIBRARY_PATH": "$LD_LIBRARY_PATH:/bg/bin/openmpi/lib"
     }
     if partitions:
         env[PARALLAX_PARTITIONS] = partitions
