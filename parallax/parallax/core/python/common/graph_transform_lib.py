@@ -65,7 +65,8 @@ dense_var_update_op_types = {"ApplyGradientDescent": 2,
                              "ApplyRMSProp": 7,
                              "ApplyCenteredRMSProp": 8,
                              "AssignAdd": 1,
-                             "AssignSub": 1}
+                             "AssignSub": 1, 
+                             "ResourceApplyGradientDescent": 2}
 sparse_var_update_op_types = {"ScatterUpdate": (1, 2),
                               "ScatterAdd": (1, 2),
                               "ScatterSub": (1, 2),
@@ -357,7 +358,7 @@ def add_sync_op(worker_id,
         if indices is None:
             grad_accum = tf.ConditionalAccumulator(
                 grad.dtype,
-                shape=var_op.outputs[0].get_shape(),
+                shape=grad.shape,
                 shared_name=var_op.name + "/grad_accum")
             # Get a copy of consumers list before creating accum_apply_op
             grad_consumers = [c for c in grad.consumers()]
@@ -415,7 +416,10 @@ def add_sync_op(worker_id,
         return update_ops
 
     def _replace_update_op_with_read_op(var_op, var_update_op, finish_op):
-        var_update_consumers = [c for c in var_update_op.outputs[0].consumers()]
+        if var_update_op.outputs:
+            var_update_consumers = [c for c in var_update_op.outputs[0].consumers()]
+        else:
+            var_update_consumers = [] 
         for consumer in var_update_consumers:
             parallax_log.debug(
                 'var: %s, var_update : %s, consumer : %s'
@@ -426,16 +430,16 @@ def add_sync_op(worker_id,
         with tf.control_dependencies([finish_op]):
             with tf.device(var_op.device):
                 updated_var_value = global_var_op_to_var[var_op].read_value()
-        update_consumers(var_update_consumers, var_update_op.outputs[0],
-                          updated_var_value)
-        tensor_or_op_name_to_replica_names.update_mapping_from_tensor(
-            var_update_op.outputs[0], updated_var_value)
+        if var_update_op.outputs:
+            update_consumers(var_update_consumers, var_update_op.outputs[0],
+                             updated_var_value)
+            tensor_or_op_name_to_replica_names.update_mapping_from_tensor(
+                var_update_op.outputs[0], updated_var_value)
 
     this_worker_cpu = tf.DeviceSpec.from_string(worker_device)
     this_worker_cpu.device_type = 'CPU'
     this_worker_cpu.device_index = 0
     is_chief = worker_id == 0
-
     trainable_var_op_to_var = \
         dict([(var.op, var)
               for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)])
@@ -500,7 +504,6 @@ def add_sync_op(worker_id,
 
         assert var_op not in trainable_var_op_to_update_op
         assert var_op not in non_trainable_var_op_to_update_op
-
         if var_op in trainable_var_op_to_var:
             trainable_var_op_to_update_op[var_op] = var_update_op
             is_trainable = True
@@ -587,11 +590,11 @@ def add_sync_op(worker_id,
 def replicate_variables_to_devices(meta_graph_def,
                                     worker_device,
                                     num_replicas_per_worker):
+    variables = [var.op.name for var in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)]
     var_op_name_to_original_device_str = {}
     for node in meta_graph_def.graph_def.node:
-        if 'Variable' in node.op:
+        if node.name in variables:
             var_op_name_to_original_device_str[node.name] = node.device
-
     sparse_var_op_names = []
     for gradients_info in tf.get_collection(tf.GraphKeys.GRADIENTS_INFO):
         grad_tensor = gradients_info._grad

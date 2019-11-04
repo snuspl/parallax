@@ -45,7 +45,10 @@ def _get_ops_to_replicate(gradiend_info_list):
     for global_var in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
         global_var_related_ops.add(global_var.op)
         global_var_related_ops.add(global_var.initializer)
-        global_var_related_ops.add(global_var._snapshot.op)
+        try:
+            global_var_related_ops.add(global_var._snapshot.op)
+        except AttributeError:
+            pass
 
     table_related_ops = set()
     for table_init in tf.get_collection(tf.GraphKeys.TABLE_INITIALIZERS):

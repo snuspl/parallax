@@ -89,7 +89,7 @@ def _prepare_worker(worker, driver_path, args, resource_info, machine_id,
 
 
 def _get_hybrid_cmd(workers, protocol, redirect_path, mpi_cmd_in_config):
-    mpi_cmd = 'mpirun -bind-to none -map-by slot' \
+    mpi_cmd = '/bg/bin/openmpi/bin/mpirun -bind-to none -map-by slot' \
               ' -mca orte_base_help_aggregate 0'\
               ' -x NCCL_DEBUG=INFO'
     arg_runop = '-x %s=%s' % (PARALLAX_RUN_OPTION, PARALLAX_RUN_HYBRID)
