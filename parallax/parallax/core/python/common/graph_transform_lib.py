@@ -66,7 +66,8 @@ dense_var_update_op_types = {"ApplyGradientDescent": 2,
                              "ApplyCenteredRMSProp": 8,
                              "AssignAdd": 1,
                              "AssignSub": 1, 
-                             "ResourceApplyGradientDescent": 2}
+                             "ResourceApplyGradientDescent": 2,
+                             "ResourceApplyRMSProp": 6}
 sparse_var_update_op_types = {"ScatterUpdate": (1, 2),
                               "ScatterAdd": (1, 2),
                               "ScatterSub": (1, 2),
