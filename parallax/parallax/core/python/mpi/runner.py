@@ -88,6 +88,7 @@ def _get_mpi_cmd(config):
     workers = config.resource_info['worker']
     mpi_cmd = 'mpirun -bind-to none -map-by slot' \
               ' -mca orte_base_help_aggregate 0'\
+              ' -mca btl_openib_allow_ib 1'\
               ' -x NCCL_DEBUG=INFO '
     mpi_cmd += config.communication_config.mpi_config.mpirun_options
 
